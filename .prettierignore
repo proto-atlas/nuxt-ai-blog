@@ -1,0 +1,19 @@
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+.output/
+.open-next/
+.wrangler/
+.data/
+coverage/
+playwright-report/
+test-results/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+*.md
+
+# フレームワーク自動生成・自動更新ファイル（Prettier 対象外）
+tsconfig.json

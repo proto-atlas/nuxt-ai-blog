@@ -1,0 +1,6 @@
+# 全クローラーに対して全パス許可、sitemap への明示的な誘導を行う。
+
+User-agent: *
+Allow: /
+
+Sitemap: https://nuxt-ai-blog.atlas-lab.workers.dev/sitemap.xml
