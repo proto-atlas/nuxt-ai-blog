@@ -47,10 +47,11 @@ describe('AiSummaryButton', () => {
     aiSummaryStub = makeStub();
   });
 
-  it('初期状態で「AI 要約を生成」ボタンを表示する', async () => {
+  it('初期状態で「AI 要約を生成」ボタンとアクセスキー入力を表示する', async () => {
     const wrapper = await mountSuspended(AiSummaryButton, { props: { slug: 'sample' } });
     expect(wrapper.text()).toContain('AI 要約を生成');
-    expect(wrapper.find('button').attributes('disabled')).toBeUndefined();
+    expect(wrapper.get('label').text()).toBe('AI要約アクセスキー');
+    expect(wrapper.find('button').attributes('disabled')).toBeDefined();
   });
 
   it('loading=true で disabled + 「生成中...」表示', async () => {
@@ -99,9 +100,10 @@ describe('AiSummaryButton', () => {
     expect(wrapper.text()).toContain('Rate limit exceeded.');
   });
 
-  it('ボタン click で summarize(slug) を呼ぶ', async () => {
+  it('アクセスキー入力後のボタン click で summarize(slug, accessKey) を呼ぶ', async () => {
     const wrapper = await mountSuspended(AiSummaryButton, { props: { slug: 'my-slug' } });
+    await wrapper.get('input').setValue('demo-key');
     await wrapper.find('button').trigger('click');
-    expect(aiSummaryStub.summarize).toHaveBeenCalledWith('my-slug');
+    expect(aiSummaryStub.summarize).toHaveBeenCalledWith('my-slug', 'demo-key');
   });
 });

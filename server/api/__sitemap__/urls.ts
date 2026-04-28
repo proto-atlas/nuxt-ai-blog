@@ -2,6 +2,7 @@
 // Nuxt Content の blog コレクションを列挙して sitemap に動的記事を含める。
 // 静的トップ (/) は @nuxtjs/sitemap がページディレクトリから自動検出するためここでは出さない。
 import type { H3Event } from 'h3';
+import { fetchBlogSitemapArticles } from '../../utils/content-query';
 import { queryCollection as defaultQueryCollection } from '#imports';
 
 export interface SitemapUrl {
@@ -35,13 +36,7 @@ export async function executeUrlsHandler(
   const queryCollection =
     (deps.queryCollection as typeof defaultQueryCollection | undefined) ?? defaultQueryCollection;
 
-  // server-side queryCollection は第 1 引数に H3Event が必須 (server-side overload)。
-  // 型定義は client 版のみ公開なので @ts-expect-error で抑制。
-  // @ts-expect-error queryCollection の server overload は型定義に公開されていない
-  const articles = await queryCollection(event, 'blog')
-    .select('path', 'date')
-    .order('date', 'DESC')
-    .all();
+  const articles = await fetchBlogSitemapArticles(event, queryCollection);
 
   return articles.map((article: { path: string; date: string }) => ({
     loc: article.path,

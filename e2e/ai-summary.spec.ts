@@ -34,6 +34,7 @@ test.describe('AI 要約', () => {
 
     const button = page.getByRole('button', { name: 'AI 要約を生成' });
     await expect(button).toBeVisible();
+    await page.getByLabel('AI要約アクセスキー').fill('demo-key');
 
     await button.click();
 
@@ -65,6 +66,7 @@ test.describe('AI 要約', () => {
     // dev server (Vite HMR の WebSocket) で networkidle が来ないため短タイムアウトで catch
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
+    await page.getByLabel('AI要約アクセスキー').fill('demo-key');
     await page.getByRole('button', { name: 'AI 要約を生成' }).click();
 
     // labelForSummaryError('rate_limit') の文言を検証
@@ -90,6 +92,7 @@ test.describe('AI 要約', () => {
     // dev server (Vite HMR の WebSocket) で networkidle が来ないため短タイムアウトで catch
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
+    await page.getByLabel('AI要約アクセスキー').fill('demo-key');
     await page.getByRole('button', { name: 'AI 要約を生成' }).click();
 
     // 日本語ラベル表示

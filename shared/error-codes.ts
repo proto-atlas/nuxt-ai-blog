@@ -7,6 +7,7 @@
  * import で参照可能。
  */
 export type SummaryErrorCode =
+  | 'access_required'
   | 'rate_limit'
   | 'invalid_input'
   | 'article_not_found'
@@ -20,6 +21,7 @@ export interface SummaryErrorData {
 }
 
 export const SUMMARY_ERROR_LABELS: Record<SummaryErrorCode, string> = {
+  access_required: 'AI 要約を生成するにはアクセスキーが必要です。',
   rate_limit: '短時間に多くのリクエストがありました。しばらく時間を置いてから再度お試しください。',
   invalid_input: '入力内容に問題があります。',
   article_not_found: '指定された記事が見つかりません。',

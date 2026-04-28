@@ -19,6 +19,7 @@
  * 6. upstream_unavailable (Anthropic SDK throw)
  * 7. AbortSignal 伝播 (event.req.signal を SDK options に渡す)
  * 8. AbortSignal なし (signal を強制注入しない)
+ * 9. access_required (アクセスキー不一致)
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { H3Event } from 'h3';
@@ -258,6 +259,53 @@ describe('executeSummaryHandler (route handler 本体)', () => {
       data: { error: 'server_misconfigured' },
     });
     expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('access_required: summaryAccessKey 設定時にヘッダが無いと 401 + access_required', async () => {
+    vi.stubGlobal('readBody', vi.fn().mockResolvedValue({ slug: 'access-required-test' }));
+    const queryCollection = makeQueryCollection(SAMPLE_ARTICLE);
+    const { ctor: AnthropicCtor, createSpy } = makeAnthropicCtor('success');
+
+    await expect(
+      executeSummaryHandler(makeEvent(), {
+        queryCollection,
+        AnthropicCtor,
+        runtimeConfig: {
+          anthropicApiKey: 'sk-test-key',
+          summaryAccessKey: 'demo-access-key',
+        },
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 401,
+      statusMessage: 'access_required',
+      data: { error: 'access_required' },
+    });
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('access key: summaryAccessKey とヘッダが一致すれば Anthropic を呼ぶ', async () => {
+    vi.stubGlobal('readBody', vi.fn().mockResolvedValue({ slug: 'access-key-success-test' }));
+    vi.stubGlobal(
+      'getRequestHeader',
+      vi.fn((_event: unknown, name: string) => {
+        if (name === 'x-summary-access-key') return 'demo-access-key';
+        if (name === 'CF-Connecting-IP') return '203.0.113.200';
+        return undefined;
+      }),
+    );
+    const queryCollection = makeQueryCollection(SAMPLE_ARTICLE);
+    const { ctor: AnthropicCtor, createSpy } = makeAnthropicCtor('success');
+
+    await executeSummaryHandler(makeEvent(), {
+      queryCollection,
+      AnthropicCtor,
+      runtimeConfig: {
+        anthropicApiKey: 'sk-test-key',
+        summaryAccessKey: 'demo-access-key',
+      },
+    });
+
+    expect(createSpy).toHaveBeenCalledTimes(1);
   });
 
   it('upstream_unavailable: Anthropic SDK が throw すると 500 + upstream_unavailable', async () => {

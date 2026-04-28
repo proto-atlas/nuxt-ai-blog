@@ -17,6 +17,22 @@ test.describe('blog', () => {
     await expect(page.getByText('ESLint 10 flat config の実務設定')).toBeVisible();
   });
 
+  test('記事検索とタグ絞り込みで一覧を絞れる', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1, name: '記事一覧' })).toBeVisible();
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    await page.getByLabel('記事検索').fill('Workers');
+    await expect(page.getByText('Cloudflare Workers で Nuxt 4 をデプロイするまで')).toBeVisible();
+    await expect(page.getByText('Tailwind CSS 4 の注目機能 5 選')).not.toBeVisible();
+
+    await page.getByRole('button', { name: '#nuxt' }).click();
+    await expect(page.getByText('Cloudflare Workers で Nuxt 4 をデプロイするまで')).toBeVisible();
+
+    await page.getByRole('button', { name: '絞り込み解除' }).click();
+    await expect(page.getByText('Tailwind CSS 4 の注目機能 5 選')).toBeVisible();
+  });
+
   test('記事詳細ページに遷移して見出しと AI 要約ボタンが出る', async ({ page }) => {
     await page.goto('/');
     // 一覧描画完了を待ってから click する (hydration 前の link click を避ける)

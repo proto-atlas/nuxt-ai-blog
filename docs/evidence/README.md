@@ -10,6 +10,8 @@
 | [`production-smoke-2026-04-28.md`](production-smoke-2026-04-28.md) | production URL に対する smoke 結果 (`/`、記事ページ、SEO 静的ファイル、OG 画像、`/api/summary` invalid payload) | 2026-04-28 |
 | [`dependency-audit-2026-04-28.md`](dependency-audit-2026-04-28.md) | `npm audit --audit-level=high --json` の結果 (0 vulnerabilities) | 2026-04-28 |
 | [`lighthouse-2026-04-28.md`](lighthouse-2026-04-28.md) | production URL の Lighthouse 13.0.1 計測結果 (desktop 99 / 100 / 100 / 100、mobile 93 / 100 / 100 / 100) | 2026-04-28 |
+| [`release-baseline-2026-04-29.md`](release-baseline-2026-04-29.md) | 公開前再検証の baseline (HEAD、公開 URL、Actions、typecheck、lint、coverage、E2E、build、publish scan、audit) | 2026-04-29 |
+| [`summary-abuse-protection-2026-04-29.md`](summary-abuse-protection-2026-04-29.md) | `/api/summary` のアクセスキー、rate limit、daily limit、cache、abort の濫用対策確認 | 2026-04-29 |
 
 ## 今後追加する Evidence
 

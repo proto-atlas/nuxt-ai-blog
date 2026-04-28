@@ -43,11 +43,12 @@ describe('useAiSummary', () => {
     vi.stubGlobal('$fetch', fetchMock);
 
     const { summary, loading, error, summarize } = useAiSummary();
-    await summarize('sample-article');
+    await summarize('sample-article', 'demo-key');
 
     expect(fetchMock).toHaveBeenCalledWith('/api/summary', {
       method: 'POST',
       body: { slug: 'sample-article' },
+      headers: { 'X-Summary-Access-Key': 'demo-key' },
     });
     expect(summary.value).toEqual(mockResponse);
     expect(loading.value).toBe(false);
@@ -63,8 +64,21 @@ describe('useAiSummary', () => {
       }),
     );
     const { error, summarize } = useAiSummary();
-    await summarize('sample-article');
+    await summarize('sample-article', 'demo-key');
     expect(error.value).toBe(SUMMARY_ERROR_LABELS.rate_limit);
+  });
+
+  it('createError({ data: { error: access_required } }) でアクセスキー文言', async () => {
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockRejectedValue({
+        data: { error: 'access_required' },
+        statusMessage: 'access_required',
+      }),
+    );
+    const { error, summarize } = useAiSummary();
+    await summarize('sample-article', '');
+    expect(error.value).toBe(SUMMARY_ERROR_LABELS.access_required);
   });
 
   it('createError({ data: { error: server_misconfigured } }) でサーバー設定エラー文言', async () => {
@@ -76,21 +90,21 @@ describe('useAiSummary', () => {
       }),
     );
     const { error, summarize } = useAiSummary();
-    await summarize('sample-article');
+    await summarize('sample-article', 'demo-key');
     expect(error.value).toBe(SUMMARY_ERROR_LABELS.server_misconfigured);
   });
 
   it('未知の code は unknown ラベルにフォールバック', async () => {
     vi.stubGlobal('$fetch', vi.fn().mockRejectedValue({ data: { error: 'never_known_code' } }));
     const { error, summarize } = useAiSummary();
-    await summarize('sample-article');
+    await summarize('sample-article', 'demo-key');
     expect(error.value).toBe(SUMMARY_ERROR_LABELS.unknown);
   });
 
   it('Error throw 等の内部詳細は UI に流さず unknown ラベル', async () => {
     vi.stubGlobal('$fetch', vi.fn().mockRejectedValue(new Error('Anthropic 502 stack trace')));
     const { error, summarize } = useAiSummary();
-    await summarize('sample-article');
+    await summarize('sample-article', 'demo-key');
     expect(error.value).toBe(SUMMARY_ERROR_LABELS.unknown);
     // 内部 message が UI に流れていないことを保証
     expect(error.value).not.toContain('Anthropic 502 stack trace');
@@ -99,7 +113,7 @@ describe('useAiSummary', () => {
   it('plain string reject も unknown ラベル', async () => {
     vi.stubGlobal('$fetch', vi.fn().mockRejectedValue('plain string'));
     const { error, summarize } = useAiSummary();
-    await summarize('sample-article');
+    await summarize('sample-article', 'demo-key');
     expect(error.value).toBe(SUMMARY_ERROR_LABELS.unknown);
   });
 
@@ -114,8 +128,8 @@ describe('useAiSummary', () => {
     vi.stubGlobal('$fetch', fetchMock);
 
     const { loading, summarize } = useAiSummary();
-    const first = summarize('a');
-    const second = summarize('b');
+    const first = summarize('a', 'demo-key');
+    const second = summarize('b', 'demo-key');
 
     expect(loading.value).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -129,7 +143,7 @@ describe('useAiSummary', () => {
     vi.stubGlobal('$fetch', vi.fn().mockResolvedValue(mockResponse));
 
     const { summary, error, summarize, reset } = useAiSummary();
-    await summarize('sample-article');
+    await summarize('sample-article', 'demo-key');
     expect(summary.value).not.toBeNull();
 
     reset();

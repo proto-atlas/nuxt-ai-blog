@@ -9,6 +9,8 @@ import { checkDailyLimit } from '../utils/daily-limit';
 import { parseSummaryRequest, extractFirstText } from '../utils/summary-parse';
 import { buildSummarySource } from '../utils/article-text';
 import { summaryError, getRequestSignal } from '../utils/summary-helpers';
+import { checkSummaryAccess } from '../utils/summary-access';
+import { fetchBlogArticleBySlug } from '../utils/content-query';
 import { queryCollection as defaultQueryCollection } from '#imports';
 
 const MODEL = 'claude-haiku-4-5-20251001';
@@ -40,7 +42,7 @@ export interface SummaryHandlerDeps {
    * 実体を resolve してしまい `[nuxt] instance unavailable` で落ちるので、
    * 依存注入で完全に切り離す。
    */
-  runtimeConfig?: { anthropicApiKey?: unknown };
+  runtimeConfig?: { anthropicApiKey?: unknown; summaryAccessKey?: unknown };
 }
 
 /**
@@ -62,6 +64,8 @@ export async function executeSummaryHandler(
   const queryCollection =
     (deps.queryCollection as typeof defaultQueryCollection | undefined) ?? defaultQueryCollection;
   const AnthropicCtor = (deps.AnthropicCtor as typeof AnthropicSdk | undefined) ?? AnthropicSdk;
+  const config = deps.runtimeConfig ?? useRuntimeConfig(event);
+
   // 1. Per-IP rate limit (1 ユーザーの連投を抑制)
   const ip = getClientIp(event);
   const rate = checkRateLimit(ip);
@@ -70,11 +74,11 @@ export async function executeSummaryHandler(
     throw summaryError('rate_limit', 429, rate.retryAfterSeconds);
   }
 
-  // 2. Global daily limit (IP rotation 攻撃や全体消費を抑制、Anthropic 課金の最終防衛)
-  const daily = checkDailyLimit();
-  if (!daily.allowed) {
-    setResponseHeader(event, 'Retry-After', daily.retryAfterSeconds);
-    throw summaryError('rate_limit', 429, daily.retryAfterSeconds);
+  // 2. Access key gate (公開記事は読めるまま、AI生成だけをデモ用キーで保護)
+  const access = checkSummaryAccess(event, config.summaryAccessKey);
+  if (!access.allowed) {
+    const code = access.error ?? 'access_required';
+    throw summaryError(code, code === 'access_required' ? 401 : 500);
   }
 
   // 3. Body parse + slug validation (parseSummaryRequest で runtime narrowing、
@@ -94,12 +98,8 @@ export async function executeSummaryHandler(
   }
 
   // 5. Fetch article body
-  // Nuxt Content 3 の server-side queryCollection は第 1 引数に event が必須
-  // (https://content.nuxt.com の Server-side Querying 仕様)。event 抜きで呼ぶと
-  // getRequestHeaders が event.node を参照する箇所で TypeError になる。
-  // 型定義は client 版 (1 引数) のみ公開されているため @ts-expect-error で抑制する。
-  // @ts-expect-error queryCollection の server overload は型定義に公開されていない
-  const article = await queryCollection(event, 'blog').path(`/blog/${slug}`).first();
+  // Nuxt Content 3 の server-side queryCollection の型境界は adapter に閉じ込める。
+  const article = await fetchBlogArticleBySlug(event, slug, queryCollection);
   if (!article) {
     throw summaryError('article_not_found', 404);
   }
@@ -113,7 +113,6 @@ export async function executeSummaryHandler(
   // production では default export 側で `useRuntimeConfig(event)` を呼んで deps に
   // 詰めて渡す。test では deps.runtimeConfig を直接渡す (Vitest の Nuxt instance
   // 依存問題を回避)。
-  const config = deps.runtimeConfig ?? useRuntimeConfig(event);
   const apiKey = config.anthropicApiKey;
   if (!apiKey || typeof apiKey !== 'string') {
     // 環境変数名そのものを UI に出さない (攻撃者にスタック推定材料を与えない)。
@@ -122,7 +121,14 @@ export async function executeSummaryHandler(
     throw summaryError('server_misconfigured', 500);
   }
 
-  // 7. Anthropic 呼び出し (try/catch で SDK 例外を捕まえる、SDK例外処理対応)。
+  // 7. Global daily limit (有効キー + cache miss + 設定正常のリクエストだけを課金枠として数える)
+  const daily = checkDailyLimit();
+  if (!daily.allowed) {
+    setResponseHeader(event, 'Retry-After', daily.retryAfterSeconds);
+    throw summaryError('rate_limit', 429, daily.retryAfterSeconds);
+  }
+
+  // 8. Anthropic 呼び出し (try/catch で SDK 例外を捕まえる、SDK例外処理対応)。
   // maxRetries: 0 で 429/5xx 時の SDK 自動リトライによる多重課金を防ぐ。
   // timeout: 30s で Anthropic 側のスタックを長時間保持しない (Cloudflare Workers の
   // CPU 時間制限 30s と Anthropic Haiku 4.5 の典型応答 1〜3s を踏まえた余裕値、
@@ -163,7 +169,7 @@ export async function executeSummaryHandler(
     throw summaryError('upstream_unavailable', 500);
   }
 
-  // 8. キャッシュ書き込み + レスポンス
+  // 9. キャッシュ書き込み + レスポンス
   const response: SummaryResponse = {
     slug,
     summary,

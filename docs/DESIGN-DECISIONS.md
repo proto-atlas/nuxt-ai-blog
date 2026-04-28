@@ -14,7 +14,7 @@
 - D1 binding が同じ Worker 内で使えて、Nuxt Content 3 の本番ストレージとして自然に繋がる
 
 **トレードオフ**:
-- Workers の **3 MiB（gzip 後）上限** は厳守必要。現在 320 kB なので余裕があるが、`@anthropic-ai/sdk` を含む段階で増えるので将来の依存追加は要監視。
+- Workers の **3 MiB（gzip 後）上限** は厳守必要。2026-04-29 時点の Nitro total は 935 kB / 308 kB gzip なので余裕があるが、将来の依存追加は要監視。
 - ローカル開発は `nuxt dev`（Vite）、本番に近い検証は `wrangler dev .output/server/index.mjs` で行う 2 段階構成。
 
 ---
@@ -48,16 +48,18 @@
 
 ---
 
-## 4. レート制限は in-memory sliding window（h3 event 版）
+## 4. AI生成はアクセスキー + in-memory rate limit で保護
 
-**決定**: Workers KV / Durable Objects / 専用 Rate Limiter binding は使わず、module-level `Map` で IP ごとに timestamp 配列を保持。`getClientIp` は `CF-Connecting-IP` 優先、フォールバックで `x-forwarded-for` の左端。
+**決定**: 公開ページはそのまま閲覧可能にし、`/api/summary` の live AI 生成だけ `NUXT_SUMMARY_ACCESS_KEY` と `X-Summary-Access-Key` で保護する。加えて Workers KV / Durable Objects / 専用 Rate Limiter binding は使わず、module-level `Map` で IP ごとに timestamp 配列を保持。`getClientIp` は `CF-Connecting-IP` 優先、フォールバックで `x-forwarded-for` の左端。
 
 **理由**:
+- ブログ本文は公開ポートフォリオとして見せたいが、AI API の課金経路だけは利用条件を設ける必要がある
 - 同一 isolate に同 IP がヒットする確率が高いデモ規模では十分機能
 - KV の書き込みレイテンシ（数十 ms）と課金を避けられる
 - `checkRateLimit(ip, now)` シグネチャで KV 版への差し替えが機械的にできる
 
 **トレードオフ**:
+- access key はデモ用の利用条件であり、ユーザー別認可ではない。本格運用では Turnstile / Cloudflare Access / アカウント制認証に置き換える。
 - 複数 isolate が並列起動するケースで制限が緩くなる。本番スケール時は `env.RATE_LIMITER.limit({ key })` Cloudflare Rate Limiter binding に置換可能。
 - 同種の公開 AI エンドポイントで共通化しやすい判断（共通の問題は共通の解で対応、コード読解負荷を下げる）。
 
@@ -92,16 +94,17 @@
 
 ---
 
-## 7. server-side `queryCollection` は **第 1 引数に event が必須**
+## 7. server-side `queryCollection` は adapter に閉じ込める
 
-**決定**: `server/api/summary.post.ts` で `queryCollection(event, 'blog').path(...).first()` と書く。client 版の `queryCollection('blog')` は使わない。
+**決定**: `server/utils/content-query.ts` に `fetchBlogArticleBySlug()` と `fetchBlogSitemapArticles()` を置き、`queryCollection(event, 'blog')` の server-side overload は adapter 内で扱う。client 版の `queryCollection('blog')` は server route では使わない。
 
 **理由**:
 - Nuxt Content 3 の公式仕様（`/nuxt/content` Server-side Querying）。client 版で呼ぶと内部の `getRequestHeaders` が `event.node` を `undefined` で参照して `TypeError: Cannot read properties of undefined (reading 'req')`
 - QA 工程で実際に踏んで debug deploy で原因特定（commit `f31c9b4`）
+- route handler 本体に `@ts-expect-error` を散在させると、面接官が型安全性の説明を追いにくい
 
 **トレードオフ**:
-- TypeScript 型定義は client 版（1 引数）のみ公開されており、`@ts-expect-error` で抑制が必要。型と runtime の乖離は Nuxt Content 3 の known issue。理由を明示するコメントを残してある。
+- TypeScript 型定義は client 版（1 引数）が中心なので、adapter 内では server-side query の最小インターフェイスを自前で定義している。将来 Nuxt Content 側の型定義が整ったら adapter を薄くできる。
 
 ---
 
@@ -134,15 +137,15 @@
 
 ---
 
-## 10. テスト戦略: Vitest 94 件 / 13 ファイル + Playwright Chromium 9 シナリオ
+## 10. テスト戦略: Vitest 109 件 / 16 ファイル + Playwright Chromium 10 シナリオ
 
-**決定**: Vitest **94 件 / 13 ファイル** (server/utils/{cache,rate-limit,daily-limit,summary-parse,article-text,summary-helpers} 6 / composables/useAiSummary 1 / components/{ArticleCard,AiSummaryButton,ThemeToggle} 3 / server/api/{summary.post,__sitemap__/urls} 2 / E2E 補助 1)、Playwright Chromium で記事一覧 / 詳細遷移 / ダークモード + AI 要約 (成功 / 429 rate_limit / 500 upstream_unavailable mock) + a11y target-size の 9 シナリオ pass。
+**決定**: Vitest **109 件 / 16 ファイル** (server/utils/{cache,rate-limit,daily-limit,summary-parse,article-text,summary-helpers,summary-access,content-query} / composables/useAiSummary / components/{ArticleCard,AiSummaryButton,ThemeToggle} / server/api/{summary.post,__sitemap__/urls} / utils/article-filter)、Playwright Chromium で記事一覧 / 検索とタグ絞り込み / 詳細遷移 / ダークモード + AI 要約 (成功 / 429 rate_limit / 500 upstream_unavailable mock) + a11y target-size の 10 シナリオ pass。
 
 **理由**:
 - AI 要約フロー (Anthropic API mock + cache + rate limit) を **E2E + handler unit (8 ケース) + composables unit (8 ケース)** の三層で守ることで、本番 smoke 未到達でも回帰検知できる
 - handler 本体は `executeSummaryHandler` を named export + `SummaryHandlerDeps` で依存注入可能化し、Anthropic SDK / queryCollection / runtimeConfig を vi.mock + class-based mock + 型 unknown キャストで切り離している
 - Markdown レンダ → Prose スタイルは Nuxt Content 3 の責務でアプリ側のテスト価値が低い
-- coverage gate は `vitest.config.ts` の閾値 (lines 60 / branches 50 / funcs 70 / statements 60) で機械的に強制、現状 stmts 95.19 / branches 88.73 / funcs 97.14 / lines 96.25
+- coverage gate は `vitest.config.ts` の閾値 (lines 60 / branches 50 / funcs 70 / statements 60) で機械的に強制、現状 stmts 95.76 / branches 87.83 / funcs 98.03 / lines 96.59
 
 **トレードオフ**:
 - `server/api/summary.post.ts` の coverage は 0% → 88.37% まで引き上げたが、per-IP rate-limit / global daily-limit Hit 時の `setResponseHeader` ブロック (72-73 / 79-80 / 183 行) は cost-benefit からテスト対象外として許容

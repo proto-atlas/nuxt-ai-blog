@@ -7,9 +7,25 @@
 const props = defineProps<{ slug: string }>();
 
 const { summary, loading, error, summarize } = useAiSummary();
+const accessKey = ref('');
+const accessKeyInputId = `summary-access-key-${props.slug}`;
+const canSubmit = computed(() => accessKey.value.trim().length > 0 && !loading.value);
+
+onMounted(() => {
+  accessKey.value = sessionStorage.getItem('nuxt-ai-blog.summary-access-key') ?? '';
+});
+
+watch(accessKey, (value) => {
+  const normalized = value.trim();
+  if (normalized) {
+    sessionStorage.setItem('nuxt-ai-blog.summary-access-key', normalized);
+  } else {
+    sessionStorage.removeItem('nuxt-ai-blog.summary-access-key');
+  }
+});
 
 async function handleClick() {
-  await summarize(props.slug);
+  await summarize(props.slug, accessKey.value);
 }
 </script>
 
@@ -24,14 +40,31 @@ async function handleClick() {
           Claude Haiku 4.5 で記事を 150 文字程度に要約します。
         </p>
       </div>
-      <button
-        type="button"
-        :disabled="loading"
-        class="inline-flex min-h-11 items-center rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:bg-emerald-400 dark:disabled:bg-emerald-800"
-        @click="handleClick"
-      >
-        {{ loading ? '生成中...' : summary ? '再生成' : 'AI 要約を生成' }}
-      </button>
+      <div class="flex w-full flex-col gap-2 sm:w-auto sm:min-w-72">
+        <label
+          :for="accessKeyInputId"
+          class="text-xs font-medium text-emerald-900 dark:text-emerald-100"
+        >
+          AI要約アクセスキー
+        </label>
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <input
+            :id="accessKeyInputId"
+            v-model="accessKey"
+            type="password"
+            autocomplete="off"
+            class="min-h-11 w-full rounded-md border border-emerald-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-800 dark:bg-slate-950 dark:text-slate-100"
+          />
+          <button
+            type="button"
+            :disabled="!canSubmit"
+            class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:bg-emerald-400 dark:disabled:bg-emerald-800"
+            @click="handleClick"
+          >
+            {{ loading ? '生成中...' : summary ? '再生成' : 'AI 要約を生成' }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <div

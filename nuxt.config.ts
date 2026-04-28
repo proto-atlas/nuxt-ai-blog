@@ -109,6 +109,9 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // サーバーサイドのみで読み取れる値。NUXT_ANTHROPIC_API_KEY で注入 (ローカル: .env、本番: wrangler secret)
     anthropicApiKey: '',
+    // /api/summary の live AI 生成を保護するデモ用アクセスキー。
+    // NUXT_SUMMARY_ACCESS_KEY で注入し、クライアント bundle には含めない。
+    summaryAccessKey: '',
   },
 
   typescript: {

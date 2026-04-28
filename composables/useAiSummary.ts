@@ -57,14 +57,16 @@ export function useAiSummary() {
   const loading = ref(false);
   const error = ref<string | null>(null);
 
-  async function summarize(slug: string): Promise<void> {
+  async function summarize(slug: string, accessKey: string): Promise<void> {
     if (loading.value) return;
     loading.value = true;
     error.value = null;
     try {
+      const normalizedAccessKey = accessKey.trim();
       const res = await $fetch<SummaryResponse>('/api/summary', {
         method: 'POST',
         body: { slug },
+        headers: normalizedAccessKey ? { 'X-Summary-Access-Key': normalizedAccessKey } : undefined,
       });
       summary.value = res;
     } catch (err) {
