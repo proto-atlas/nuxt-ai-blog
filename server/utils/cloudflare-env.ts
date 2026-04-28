@@ -41,7 +41,7 @@ export interface CloudflareEnv {
   /** D1 binding (`wrangler.jsonc` の `bindings.DB`)。Nuxt Content 3 が D1 切替後に使用予定 */
   DB?: unknown;
   /**
-   * Rate Limiting binding (改善で wrangler.jsonc に追加予定)。
+   * Rate Limiting binding を追加した場合の adapter。
    * 現状は未配線、binding 追加 + 本番 smoke は公開前最終確認送り。
    */
   RATE_LIMITER?: CloudflareRateLimiter;

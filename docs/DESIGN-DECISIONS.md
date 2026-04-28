@@ -1,6 +1,6 @@
 # Design Decisions
 
-このドキュメントは nuxt-ai-blog を実装する時に下した**トレードオフを伴う判断**とその理由を記録する。citation-reader の DESIGN-DECISIONS.md と対をなす。
+このドキュメントは nuxt-ai-blog を実装する時に下した**トレードオフを伴う判断**とその理由を記録する。
 
 ---
 
@@ -10,7 +10,7 @@
 
 **理由**:
 - Free 枠 100,000 req/day で十分（デモ用途）
-- citation-reader と同じ Cloudflare アカウントに集約してコスト管理を一本化
+- Cloudflare アカウントに集約してコスト管理を一本化
 - D1 binding が同じ Worker 内で使えて、Nuxt Content 3 の本番ストレージとして自然に繋がる
 
 **トレードオフ**:
@@ -21,10 +21,10 @@
 
 ## 2. AI 要約は **non-streaming POST**
 
-**決定**: citation-reader と違って SSE / streaming を使わず、`Anthropic.messages.create` を 1 回呼んで `max_tokens: 256` の応答を待つ。
+**決定**: SSE / streaming を使わず、`Anthropic.messages.create` を 1 回呼んで `max_tokens: 256` の応答を待つ。
 
 **理由**:
-- 要約は 150 字以内 / 1〜2 文の短い出力。生成時間は ~3〜5 秒で、ストリーミングの UX 改善が小さい
+- 要約は 150 字以内 / 1〜2 文の短い出力。生成時間は ~3〜5 秒で、ストリーミングによる UX 上の差分が小さい
 - API 仕様 / クライアント実装 / テストが大幅にシンプルになる（fetch 1 回 → JSON 受け取り）
 - 短時間処理ゆえ「キャンセルボタン」UI も不要にできる（連打防止だけで十分）
 
@@ -59,7 +59,7 @@
 
 **トレードオフ**:
 - 複数 isolate が並列起動するケースで制限が緩くなる。本番スケール時は `env.RATE_LIMITER.limit({ key })` Cloudflare Rate Limiter binding に置換可能。
-- citation-reader と同型の判断（共通の問題は共通の解で対応、コード読解負荷を下げる）。
+- 同種の公開 AI エンドポイントで共通化しやすい判断（共通の問題は共通の解で対応、コード読解負荷を下げる）。
 
 ---
 
@@ -112,7 +112,7 @@
 **理由**:
 - Cloudflare Workers の `Request.signal` の abort event 配信には flag が必須（2025-05-22 の Cloudflare changelog）
 - ページ離脱で Anthropic SDK 呼び出しが中断され、レスポンス受信前なら課金停止
-- citation-reader の SSE streaming で得た教訓を AI 系全エンドポイントに横展開
+- AI 系エンドポイントで得た知見を横展開
 
 **トレードオフ**:
 - flag 無し時の挙動は「listener が発火しない」だけで Workers 自体は動くため、忘れた時の発覚が遅い。`wrangler.jsonc` のコメントで明示してプロジェクトテンプレ化。

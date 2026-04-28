@@ -103,7 +103,7 @@ export async function executeSummaryHandler(
   if (!article) {
     throw summaryError('article_not_found', 404);
   }
-  // Nuxt Content 3 の MDC AST から平文を抽出 (改善で本実装)。
+  // Nuxt Content 3 の MDC AST から平文を抽出する。
   // title + description + 本文 (text node 連結、4000 文字 truncate) を要約源に。
   // body 抽出失敗時は title + description のみで fallback (article-text.test.ts でカバー)。
   // BlogCollectionItem は { title, description, body } を含むので構造的 subtype で渡せる。
@@ -153,7 +153,7 @@ export async function executeSummaryHandler(
     );
 
     // content は TextBlock のみを想定 (画像含まない)。extractFirstText で型を
-    // narrow し、外部 API 形式変更にも空文字 fallback で耐える (改善)。
+    // narrow し、外部 API 形式変更にも空文字 fallback で耐える。
     summary = extractFirstText(msg.content);
     model = MODEL;
   } catch (err) {

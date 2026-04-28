@@ -1,6 +1,6 @@
 /**
  * In-memory sliding window rate limiter, keyed by IP.
- * citation-reader の lib/rate-limit.ts と同等の挙動 (Nuxt/Nitro サーバー向けに移植)。
+ * Nuxt/Nitro サーバー向けの in-memory sliding window rate limiter。
  *
  * なぜ in-memory:
  *   - デモ規模のトラフィック、ほぼ同一 Worker isolate にヒット

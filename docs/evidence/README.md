@@ -7,12 +7,12 @@
 | ファイル | 用途 | 作成日 |
 |---|---|---|
 | [`a11y-target-size-2026-04-27.md`](a11y-target-size-2026-04-27.md) | WCAG 2.2 Target Size 44×44 の主要操作検査結果 (Chromium / 主要画面 3 ケース pass) | 2026-04-27 |
+| [`production-smoke-2026-04-28.md`](production-smoke-2026-04-28.md) | production URL に対する smoke 結果 (`/`、記事ページ、SEO 静的ファイル、OG 画像、`/api/summary` invalid payload) | 2026-04-28 |
 
 ## 今後追加する Evidence
 
 | ファイル例 | 用途 |
 |---|---|
-| `production-smoke-YYYY-MM-DD.md` | production URL に対する smoke 結果 (`/`、`/blog/<slug>`、`/sitemap.xml`、`/robots.txt`、security headers、`/api/summary` の invalid payload / unknown slug / rate-limit) |
 | `lighthouse-YYYY-MM-DD.md` + JSON | production URL の Lighthouse 計測結果 (Performance / Accessibility / Best Practices / SEO、Core Web Vitals) |
 | `dependency-audit-YYYY-MM-DD.md` | `npm audit --audit-level=high` 結果、package-lock hash、依存総数、moderate 残の説明 |
 | `summary-eval-live-YYYY-MM-DD.md` | `RUN_LIVE_ANTHROPIC=1` で実行する live Anthropic eval 結果、token usage / cost、出力品質基準との突き合わせ |

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkRateLimit } from './rate-limit';
 
 // 各テストで異なる IP を使い、module-level の buckets が干渉しないようにする。
-// (citation-reader の rate-limit.test.ts と同じパターン)
+// 時刻を固定して sliding window の境界を検証する。
 
 describe('checkRateLimit', () => {
   it('初回リクエストは許可され、remainingが9になる', () => {

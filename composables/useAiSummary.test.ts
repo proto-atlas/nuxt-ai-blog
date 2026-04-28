@@ -1,6 +1,6 @@
 // useAiSummary composable のテスト。
 // $fetch (Nuxt auto-import) を vi.stubGlobal で差し替えて、成功 / エラー / 多重呼び出しを検証する。
-// 改善以降: サーバー側 createError({ data: { error: SummaryErrorCode } }) を
+// サーバー側 createError({ data: { error: SummaryErrorCode } }) を
 // labelForSummaryError で日本語ラベルに変換して error.value にセットする方式。
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAiSummary } from './useAiSummary';

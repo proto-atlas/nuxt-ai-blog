@@ -3,8 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2026-04-24',
-  // 本番ビルドに devtools の痕跡 (data-* / hydration helper) を残さない
-  // (改善 セキュリティヘッダ対応 周辺対応)
+  // 本番ビルドに devtools の痕跡 (data-* / hydration helper) を残さない。
   devtools: { enabled: process.env.NODE_ENV !== 'production' },
 
   app: {
@@ -63,7 +62,7 @@ export default defineNuxtConfig({
 
   content: {
     // Node.js 22+ 組み込みの native SQLite を使用 (Windows で better-sqlite3 の
-    // node-gyp ビルドを避ける。本番 Cloudflare Workers では 改善で D1 に切替予定)
+    // node-gyp ビルドを避ける。本番 Cloudflare Workers では D1 に切り替える)
     experimental: {
       sqliteConnector: 'native',
     },
@@ -79,7 +78,7 @@ export default defineNuxtConfig({
 
   routeRules: {
     '/**': {
-      // citation-reader で発覚したセキュリティヘッダ欠落を Nitro レベルで全ルート一括付与
+      // セキュリティヘッダを Nitro レベルで全ルート一括付与する。
       headers: {
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
@@ -103,9 +102,6 @@ export default defineNuxtConfig({
           "form-action 'self'",
           "object-src 'none'",
         ].join('; '),
-        // Nitro / Nuxt が出力する X-Powered-By: Nuxt を空文字で上書き抑止
-        // (情報露出最小化、改善 セキュリティヘッダ対応 対応)
-        'X-Powered-By': '',
       },
     },
   },
