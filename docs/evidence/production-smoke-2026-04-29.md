@@ -1,0 +1,60 @@
+# Production Smoke - 2026-04-29
+
+nuxt-ai-blog の `591cc475e2e917f48f29e213194414f0c99a268d` を Cloudflare Workers に deploy した後の smoke 記録です。
+
+## Deploy
+
+- Repository: `proto-atlas/nuxt-ai-blog`
+- HEAD: `591cc475e2e917f48f29e213194414f0c99a268d`
+- Public URL: `https://nuxt-ai-blog.atlas-lab.workers.dev`
+- Deploy command: `npm run deploy`
+- Result: success
+- Worker startup time: 43 ms
+- Upload: 1168.57 KiB / gzip 298.69 KiB
+
+Deploy 時の warning:
+
+- `@nuxt/content` が Cloudflare 向けに D1 binding `DB` へ切り替える warning
+- sourcemap に関する Vite plugin warning
+- Cloudflare unenv preset の sideEffects による bare import warning
+
+## Basic Smoke
+
+| Check | Result |
+|---|---|
+| `HEAD /` | HTTP 200 |
+| `POST /api/summary` without `X-Summary-Access-Key` | HTTP 401 |
+
+未認証レスポンスは `access_required` 系の拒否として機能していることを確認した。アクセスキー値はチャット、stdout、Git、evidence に記録していない。
+
+## Live AI Smoke
+
+`X-Summary-Access-Key` をローカル `.env.local` から読み取り、公開記事 `nuxt-on-cloudflare-workers` の要約を1件だけ生成した。
+
+| Field | Result |
+|---|---|
+| HTTP status | 200 |
+| slug | `nuxt-on-cloudflare-workers` |
+| model | `claude-haiku-4-5-20251001` |
+| summary length | 115 characters |
+| cached | `false` |
+| generatedAt | `2026-04-28T16:30:45Z` 相当 |
+
+同じ slug を直後に再実行した結果:
+
+| Field | Result |
+|---|---|
+| HTTP status | 200 |
+| slug | `nuxt-on-cloudflare-workers` |
+| model | `claude-haiku-4-5-20251001` |
+| summary length | 122 characters |
+| cached | `false` |
+| generatedAt | `2026-04-28T16:31:11Z` 相当 |
+
+## Interpretation
+
+- live AI生成は本番で成功した。
+- アクセスキーなしの呼び出しは 401 で拒否された。
+- 同一 slug の直後再実行でも `cached:true` は確認できなかった。これは in-memory cache が Worker isolate 単位で分かれる既知制約と整合する。成功扱いにはせず、cache hit の本番証跡は未取得として扱う。
+- 本格運用で cache hit を強く保証するなら、KV、Durable Objects、D1、または Cache API に移す。
+
