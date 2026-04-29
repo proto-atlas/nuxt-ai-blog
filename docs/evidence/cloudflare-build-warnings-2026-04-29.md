@@ -6,6 +6,7 @@
 
 - Project: `nuxt-ai-blog`
 - Deployment mode: Cloudflare Workers (`nitro.preset = cloudflare_module`)
+- Tracking reviewed at: 2026-04-29
 - Live AI call: not performed
 - Result: warnings documented; build and deploy still pass
 
@@ -21,14 +22,21 @@
 
 ## Warning Matrix
 
-| Warning | What it means here | Current impact | Next action |
-|---|---|---|---|
-| Nuxt Content switches to D1 binding `DB` for Cloudflare deployment | This project deploys to Workers and has a `DB` D1 binding in `wrangler.jsonc`. Nuxt Content storage is separate from AI summary quota/cache. | Build/deploy pass. Content pages load in production smoke. | Keep Workers D1 configuration explicit. If Pages deployment is introduced later, document that separately. |
-| Vue language plugin export warning | `nuxt typecheck` reports `vue-router/volar/sfc-route-blocks` export warning. | Typecheck exits 0. No emitted type error. | Track after Vue / vue-router / Nuxt updates. |
-| Vite module-preload / Tailwind sourcemap warning | Sourcemap quality warning during generated build output (`nuxt:module-preload-polyfill`, `@tailwindcss/vite`). | Build/deploy pass. No runtime failure observed in production smoke. | Treat as build tooling noise unless stack traces or source-map debugging become a release requirement. |
-| Nitro virtual storage external dependency warning | Generated Nitro output treats `@nuxt/nitro-server/dist/runtime/utils/cache-driver.js` as external dependency. | Build exits 0. Existing production smoke passes. | Track after Nuxt/Nitro updates; do not hide the warning in evidence. |
-| Cloudflare unenv bare import warning | Generated Nitro output includes imports that Cloudflare/unenv warns about. | `wrangler deploy --dry-run` and deploy pass. | Track after Nuxt/Nitro updates; do not hide the warning in evidence. |
-| Duplicate `euro` key warning from generated output | Generated dependency output warning, not authored application logic. | Build/deploy pass. | Track after dependency updates. |
+| Warning | What it means here | Current impact | Next check | Resolution condition |
+|---|---|---|---|---|
+| Nuxt Content switches to D1 binding `DB` for Cloudflare deployment | This project deploys to Workers and has a `DB` D1 binding in `wrangler.jsonc`. Nuxt Content storage is separate from AI summary quota/cache. | Build/deploy pass. Content pages load in production smoke. | Recheck after Nuxt Content or deployment-mode changes. | Keep as documented while Workers+D1 remains the chosen deployment mode. Reclassify only if production content loading fails or the deployment mode changes to Pages/static output. |
+| Vue language plugin export warning | `nuxt typecheck` reports `vue-router/volar/sfc-route-blocks` export warning. | Typecheck exits 0. No emitted type error. | Recheck after Vue / vue-router / Nuxt updates. | Remove from warning list only when the upstream warning disappears while typecheck remains pass. |
+| Vite module-preload / Tailwind sourcemap warning | Sourcemap quality warning during generated build output (`nuxt:module-preload-polyfill`, `@tailwindcss/vite`). | Build/deploy pass. No runtime failure observed in production smoke. | Recheck when stack-trace debugging or source-map quality becomes a release requirement. | Treat as tooling noise unless it blocks debugging, sourcemap upload, or production deploy. |
+| Nitro virtual storage external dependency warning | Generated Nitro output treats `@nuxt/nitro-server/dist/runtime/utils/cache-driver.js` as external dependency. | Build exits 0. Existing production smoke passes. | Recheck after Nuxt/Nitro updates. | Remove only after the generated Nitro output no longer emits the warning and production smoke still passes. |
+| Cloudflare unenv bare import warning | Generated Nitro output includes imports that Cloudflare/unenv warns about. | `wrangler deploy --dry-run` and deploy pass. | Recheck after Nuxt/Nitro/Cloudflare runtime updates. | Remove only after dry-run deploy and production deploy pass without the warning. |
+| Duplicate `euro` key warning from generated output | Generated dependency output warning, not authored application logic. | Build/deploy pass. | Recheck after dependency updates. | Remove only after generated output no longer emits the duplicate-key warning. |
+
+## Tracking Policy
+
+- These warnings are not hidden or suppressed in CI output.
+- A warning is not treated as resolved just because build/deploy exits 0.
+- A warning can be removed from this evidence only when the matching resolution condition above is met.
+- If a warning starts affecting runtime behavior, production smoke, typecheck, or deploy, it becomes a release blocker instead of an informational note.
 
 ## Boundary Between D1 and Durable Objects
 

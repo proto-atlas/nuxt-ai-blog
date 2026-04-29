@@ -40,7 +40,7 @@
 | Production `cached:true` evidence is limited to one manual fixture | Medium | `SummaryCacheDO` production smoke confirmed first request `cached:false`, second request `cached:true` for `nuxt-on-cloudflare-workers`. | Add more manual fixtures only if cost/rate-limit budget allows. |
 | Global daily quota depends on DO binding being present | Medium | Production route fails loud with `server_misconfigured` if `SUMMARY_QUOTA` / `SUMMARY_CACHE` is missing; deploy log confirmed both bindings. | Keep binding verification in deploy evidence. |
 | Per-IP short-window guard is still in-memory | Medium | Used only as a short-window guard; global daily live-generation quota is centralized in `GlobalSummaryQuotaDO`. | Add Cloudflare Rate Limiting binding or Turnstile for production SaaS abuse protection. |
-| Nuxt Content / D1 / sourcemap / unenv warnings remain | Medium | Build succeeds; warning scope is documented in [cloudflare-build-warnings-2026-04-29.md](./cloudflare-build-warnings-2026-04-29.md). | Track after Nuxt/Nitro/Cloudflare updates. |
+| Nuxt Content / D1 / sourcemap / unenv warnings remain | Medium | Build succeeds; warning scope, next checks, and resolution conditions are documented in [cloudflare-build-warnings-2026-04-29.md](./cloudflare-build-warnings-2026-04-29.md). | Recheck after Nuxt/Nitro/Cloudflare updates; treat as blocker if runtime, smoke, typecheck, or deploy is affected. |
 | Live summary eval is limited | Medium | Static smoke, mock E2E, manual live smoke, and non-billable fixture quality eval exist. | Add live quality eval only with a fixed small fixture and cost warning. |
 
 ## Not Performed
