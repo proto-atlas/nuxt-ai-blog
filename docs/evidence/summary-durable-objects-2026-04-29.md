@@ -34,9 +34,9 @@
 
 | Check | Result |
 |---|---|
-| Targeted unit tests | `server/utils/summary-control.test.ts`, `server/utils/summary-durable-objects.test.ts`, `server/utils/cloudflare-env.test.ts`, `server/api/summary.post.test.ts` pass: 27 tests |
-| Full unit tests | `vitest run --passWithNoTests --maxWorkers=1` pass: 18 files / 121 tests |
-| Coverage | `vitest run --coverage --passWithNoTests --maxWorkers=1` pass: stmts 84.86 / branches 79.20 / funcs 90.00 / lines 86.49 |
+| Targeted unit tests | `server/utils/summary-control.test.ts`, `server/utils/summary-durable-objects.test.ts`, `server/api/summary.post.test.ts`, `server/utils/summary-quality.test.ts`, `server/utils/summary-ai-client.test.ts` pass: 28 tests |
+| Full unit tests | `vitest run --coverage --maxWorkers=1` pass: 20 files / 126 tests |
+| Coverage | `vitest run --coverage --maxWorkers=1` pass: stmts 85.51 / branches 79.67 / funcs 90.74 / lines 87.10 |
 | Typecheck | `nuxt typecheck` exit 0 |
 | ESLint | `eslint .` exit 0 |
 | Prettier | `prettier --check .` exit 0 |
@@ -45,10 +45,11 @@
 | Production deploy | `wrangler deploy` exit 0; `SUMMARY_QUOTA`, `SUMMARY_CACHE`, `DB`, `ASSETS` bindings recognized. Cloudflare Version ID changes on each deploy and is intentionally not fixed in this public evidence. |
 | Manual live summary smoke | same slug / same articleHash / same model: first request `cached:false`, second request `cached:true`; summary length 100; `generatedAt` `2026-04-29T07:10:09.254Z` |
 
-## 未確認
+## Diagnostics
 
-- Production quotaRemaining behavior is not exposed by the public API response.
-- Production 429 burst test. This is intentionally not part of normal smoke unless a safe low threshold is configured.
+- Production quotaRemaining behavior is intentionally not exposed by the public API response.
+- Reserve / succeeded / failed-after-upstream-call behavior is documented in [`summary-quota-diagnostics-2026-04-29.md`](./summary-quota-diagnostics-2026-04-29.md).
+- Production 429 burst test is intentionally not part of normal smoke unless a safe low threshold is configured.
 
 ## Production Issue Found and Fixed
 

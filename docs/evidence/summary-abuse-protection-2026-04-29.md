@@ -45,6 +45,7 @@
 
 - access key は面接・デモ用の利用条件であり、ユーザーごとの権限管理ではない。
 - per-IP rate limit は in-memory 実装のため、Cloudflare Workers の複数 isolate では短期連投抑止として扱う。global daily quota の source of truth にはしない。
-- `SummaryCacheDO` / `GlobalSummaryQuotaDO` は `wrangler deploy --dry-run` でbundle確認済みだが、deploy後の manual-live-summary-smoke は未実施。
+- `SummaryCacheDO` / `GlobalSummaryQuotaDO` は `wrangler deploy --dry-run` とdeploy後の manual-live-summary-smoke で確認済み。
 - 本格SaaS化する場合は Cloudflare Rate Limiting binding、Turnstile、Cloudflare Access、またはアカウント制の認証を追加検討する。
-- 本番 `cached:true` と quotaRemaining は deploy 後に、小さいfixtureと既知cold cache keyで別 evidence として記録する。
+- 本番 `cached:true` は [`production-smoke-2026-04-29.md`](./production-smoke-2026-04-29.md) と [`summary-durable-objects-2026-04-29.md`](./summary-durable-objects-2026-04-29.md) に記録済み。
+- quotaRemaining / reserve / succeeded / failed-after-upstream-call は公開APIレスポンスへ出さず、[`summary-quota-diagnostics-2026-04-29.md`](./summary-quota-diagnostics-2026-04-29.md) のunit-level diagnosticsで確認する。

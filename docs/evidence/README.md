@@ -13,13 +13,15 @@
 | [`release-baseline-2026-04-29.md`](release-baseline-2026-04-29.md) | 公開前再検証のpoint-in-time snapshot (公開 URL、Actions、typecheck、lint、coverage、E2E、build、publish scan、audit) | 2026-04-29 |
 | [`summary-abuse-protection-2026-04-29.md`](summary-abuse-protection-2026-04-29.md) | `/api/summary` のアクセスキー、rate limit、daily limit、cache、abort の濫用対策確認 | 2026-04-29 |
 | [`summary-durable-objects-2026-04-29.md`](summary-durable-objects-2026-04-29.md) | `/api/summary` の Durable Objects summary cache / global daily quota 実装確認 | 2026-04-29 |
+| [`summary-quota-diagnostics-2026-04-29.md`](summary-quota-diagnostics-2026-04-29.md) | quota内部状態を公開APIへ出さずにunit test / DO storage相当で確認した記録 | 2026-04-29 |
+| [`summary-quality-eval-2026-04-29.md`](summary-quality-eval-2026-04-29.md) | live AIを追加実行しないfixture-based summary品質eval | 2026-04-29 |
+| [`cloudflare-build-warnings-2026-04-29.md`](cloudflare-build-warnings-2026-04-29.md) | Nuxt Content / D1 / sourcemap / unenv warningの影響範囲と扱い | 2026-04-29 |
 | [`production-smoke-2026-04-29.md`](production-smoke-2026-04-29.md) | deploy後の公開URL、未認証拒否、本番live AI要約smoke結果 | 2026-04-29 |
 
 ## 今後追加する Evidence
 
 | ファイル例 | 用途 |
 |---|---|
-| `summary-eval-live-YYYY-MM-DD.md` | `RUN_LIVE_ANTHROPIC=1` で実行する live Anthropic eval 結果、token usage / cost、出力品質基準との突き合わせ |
 | `build-size-YYYY-MM-DD.md` | Nitro build 出力の bundle size (server / client / sqlite-wasm)、D1 切替後の wasm 削減状況 |
 
 ## 運用ルール

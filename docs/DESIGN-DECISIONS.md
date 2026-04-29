@@ -141,15 +141,15 @@
 
 ---
 
-## 10. テスト戦略: Vitest 109 件 / 16 ファイル + Playwright Chromium 10 シナリオ
+## 10. テスト戦略: Vitest 126 件 / 20 ファイル + Playwright Chromium 10 シナリオ
 
-**決定**: Vitest **109 件 / 16 ファイル** (server/utils/{cache,rate-limit,daily-limit,summary-parse,article-text,summary-helpers,summary-access,content-query} / composables/useAiSummary / components/{ArticleCard,AiSummaryButton,ThemeToggle} / server/api/{summary.post,__sitemap__/urls} / utils/article-filter)、Playwright Chromium で記事一覧 / 検索とタグ絞り込み / 詳細遷移 / ダークモード + AI 要約 (成功 / 429 rate_limit / 500 upstream_unavailable mock) + a11y target-size の 10 シナリオ pass。
+**決定**: Vitest **126 件 / 20 ファイル** (server/utils/{cache,rate-limit,daily-limit,summary-parse,article-text,summary-helpers,summary-access,content-query,summary-control,summary-durable-objects,summary-quality,summary-ai-client} / composables/useAiSummary / components/{ArticleCard,AiSummaryButton,ThemeToggle} / server/api/{summary.post,__sitemap__/urls} / utils/article-filter)、Playwright Chromium で記事一覧 / 検索とタグ絞り込み / 詳細遷移 / ダークモード + AI 要約 (成功 / 429 rate_limit / 500 upstream_unavailable mock) + a11y target-size の 10 シナリオ pass。
 
 **理由**:
 - AI 要約フロー (Anthropic API mock + cache + rate limit) を **E2E + handler unit (8 ケース) + composables unit (8 ケース)** の三層で守ることで、本番 smoke 未到達でも回帰検知できる
-- handler 本体は `executeSummaryHandler` を named export + `SummaryHandlerDeps` で依存注入可能化し、Anthropic SDK / queryCollection / runtimeConfig を vi.mock + class-based mock + 型 unknown キャストで切り離している
+- handler 本体は `executeSummaryHandler` を named export + `SummaryHandlerDeps` で依存注入可能化し、Anthropic SDK 境界を `summary-ai-client` adapterへ閉じ込め、route本体は `summaryClient` / queryCollection / runtimeConfig を差し替える
 - Markdown レンダ → Prose スタイルは Nuxt Content 3 の責務でアプリ側のテスト価値が低い
-- coverage gate は `vitest.config.ts` の閾値 (lines 60 / branches 50 / funcs 70 / statements 60) で機械的に強制、現状 stmts 95.76 / branches 87.83 / funcs 98.03 / lines 96.59
+- coverage gate は `vitest.config.ts` の閾値 (lines 60 / branches 50 / funcs 70 / statements 60) で機械的に強制、現状 stmts 85.51 / branches 79.67 / funcs 90.74 / lines 87.10
 
 **トレードオフ**:
 - `server/api/summary.post.ts` の coverage は 0% → 88.37% まで引き上げたが、per-IP rate-limit / global daily-limit Hit 時の `setResponseHeader` ブロック (72-73 / 79-80 / 183 行) は cost-benefit からテスト対象外として許容

@@ -1,14 +1,15 @@
-// 理由: @anthropic-ai/sdk 0.90 の messages.create の戻り値型が ESLint の型推論と
-// 相性が悪く、unsafe 系エラーを誤検出する。実行時の型安全性は SDK 側で保証される。
-
-import AnthropicSdk from '@anthropic-ai/sdk';
 import type { H3Event } from 'h3';
 import { checkRateLimit, getClientIp } from '../utils/rate-limit';
-import { parseSummaryRequest, extractFirstText } from '../utils/summary-parse';
+import { parseSummaryRequest } from '../utils/summary-parse';
 import { buildSummarySource } from '../utils/article-text';
 import { summaryError, getRequestSignal } from '../utils/summary-helpers';
 import { checkSummaryAccess } from '../utils/summary-access';
 import { fetchBlogArticleBySlug } from '../utils/content-query';
+import {
+  createAnthropicSummaryClient,
+  SUMMARY_MODEL,
+  type SummaryAiClient,
+} from '../utils/summary-ai-client';
 import {
   buildSummaryCacheKey,
   claimSummaryGeneration,
@@ -24,7 +25,6 @@ import {
 } from '../utils/summary-control';
 import { queryCollection as defaultQueryCollection } from '#imports';
 
-const MODEL = 'claude-haiku-4-5-20251001';
 const SUMMARY_TTL_MS = 60 * 60 * 1000; // 1 時間
 const SUMMARY_PENDING_TTL_MS = 35 * 1000; // Anthropic timeout 30s + commit 余裕
 const SUMMARY_PENDING_WAIT_MS = 10 * 1000; // 同一 key の二重生成を避ける待機上限
@@ -46,8 +46,8 @@ export interface SummaryResponse {
 export interface SummaryHandlerDeps {
   /** `@nuxt/content` の queryCollection (server overload)。test では mock 関数を渡す。 */
   queryCollection?: unknown;
-  /** Anthropic SDK の constructor。test では mock class を渡す。 */
-  AnthropicCtor?: unknown;
+  /** Anthropic SDK 境界を隠す adapter。test では mock client を渡す。 */
+  summaryClient?: SummaryAiClient;
   /**
    * Runtime config (`useRuntimeConfig(event)` の結果)。
    * production では default export 側で `useRuntimeConfig(event)` を呼んで渡す。
@@ -76,7 +76,7 @@ export async function executeSummaryHandler(
   // collection 第一引数) によるテスト側の TypeScript 不整合を吸収する。
   const queryCollection =
     (deps.queryCollection as typeof defaultQueryCollection | undefined) ?? defaultQueryCollection;
-  const AnthropicCtor = (deps.AnthropicCtor as typeof AnthropicSdk | undefined) ?? AnthropicSdk;
+  const summaryClient = deps.summaryClient ?? createAnthropicSummaryClient();
   const config = deps.runtimeConfig ?? useRuntimeConfig(event);
 
   // 1. Per-IP rate limit (1 ユーザーの連投を抑制)
@@ -114,7 +114,7 @@ export async function executeSummaryHandler(
   // body 抽出失敗時は title + description のみで fallback (article-text.test.ts でカバー)。
   // BlogCollectionItem は { title, description, body } を含むので構造的 subtype で渡せる。
   const sourceText = buildSummarySource(article);
-  const cacheKey = await buildSummaryCacheKey({ slug, model: MODEL, sourceText });
+  const cacheKey = await buildSummaryCacheKey({ slug, model: SUMMARY_MODEL, sourceText });
   const controlResolution = resolveSummaryControl(event);
   if (isProductionRuntime() && controlResolution.missingBindings.length > 0) {
     console.error(
@@ -184,31 +184,15 @@ export async function executeSummaryHandler(
   // レスポンス未受信なら Anthropic 側の課金を回避できる
   // (Workers Spend Limit が最終防衛、enable_request_signal が前段防衛、
   // これが中段防衛)。
-  const client = new AnthropicCtor({ apiKey, maxRetries: 0, timeout: 30_000 });
   const requestSignal = getRequestSignal(event);
   let summary: string;
   let model: string;
   try {
-    const msg = await client.messages.create(
-      {
-        model: MODEL,
-        max_tokens: 256,
-        system:
-          'あなたは技術記事を 150 文字以内で簡潔に要約するアシスタントです。回答は日本語で、箇条書きではなく 1〜2 文の平文で書いてください。',
-        messages: [
-          {
-            role: 'user',
-            content: `次の記事 (タイトル / 概要 / 本文の要点) を読んで、主要な論点を 150 文字以内で要約してください。\n\n---\n\n${sourceText}`,
-          },
-        ],
-      },
-      requestSignal ? { signal: requestSignal } : undefined,
+    const generated = await summaryClient.createSummary(
+      requestSignal ? { apiKey, sourceText, signal: requestSignal } : { apiKey, sourceText },
     );
-
-    // content は TextBlock のみを想定 (画像含まない)。extractFirstText で型を
-    // narrow し、外部 API 形式変更にも空文字 fallback で耐える。
-    summary = extractFirstText(msg.content);
-    model = MODEL;
+    summary = generated.summary;
+    model = generated.model;
   } catch (err) {
     // SDK 例外の生 message は UI に出さない (OWASP Improper Error Handling)。
     // 詳細はサーバーログにのみ残す。
