@@ -63,11 +63,11 @@ export function useAiSummary() {
     error.value = null;
     try {
       const normalizedAccessKey = accessKey.trim();
-      const res = await $fetch<SummaryResponse>('/api/summary', {
+      const res = (await $fetch('/api/summary', {
         method: 'POST',
         body: { slug },
         headers: normalizedAccessKey ? { 'X-Summary-Access-Key': normalizedAccessKey } : undefined,
-      });
+      })) as SummaryResponse;
       summary.value = res;
     } catch (err) {
       // 内部 code を日本語ラベルに変換し、raw error は UI に出さない。

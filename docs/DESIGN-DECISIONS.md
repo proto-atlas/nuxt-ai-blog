@@ -15,7 +15,7 @@
 
 **トレードオフ**:
 - Workers の **3 MiB（gzip 後）上限** は厳守必要。2026-04-29 時点の Nitro total は 935 kB / 308 kB gzip なので余裕があるが、将来の依存追加は要監視。
-- ローカル開発は `nuxt dev`（Vite）、本番に近い検証は `wrangler dev .output/server/index.mjs` で行う 2 段階構成。
+- ローカル開発は `nuxt dev`（Vite）、本番に近い検証は `nuxt build` 後に `wrangler dev` / `wrangler deploy --dry-run` で custom wrapper entry (`worker/index.mjs`) を通して行う 2 段階構成。
 
 ---
 
@@ -48,35 +48,39 @@
 
 ---
 
-## 4. AI生成はアクセスキー + in-memory rate limit で保護
+## 4. AI生成はアクセスキー + short-window guard + Durable Objects quota で保護
 
-**決定**: 公開ページはそのまま閲覧可能にし、`/api/summary` の live AI 生成だけ `NUXT_SUMMARY_ACCESS_KEY` と `X-Summary-Access-Key` で保護する。加えて Workers KV / Durable Objects / 専用 Rate Limiter binding は使わず、module-level `Map` で IP ごとに timestamp 配列を保持。`getClientIp` は `CF-Connecting-IP` 優先、フォールバックで `x-forwarded-for` の左端。
+**決定**: 公開ページはそのまま閲覧可能にし、`/api/summary` の live AI 生成だけ `NUXT_SUMMARY_ACCESS_KEY` と `X-Summary-Access-Key` で保護する。短期連投は module-level `Map` の per-IP sliding window で抑え、global daily live-generation quota は固定名 `GlobalSummaryQuotaDO` に集約する。`getClientIp` は `CF-Connecting-IP` 優先、フォールバックで `x-forwarded-for` の左端。
 
 **理由**:
 - ブログ本文は公開ポートフォリオとして見せたいが、AI API の課金経路だけは利用条件を設ける必要がある
-- 同一 isolate に同 IP がヒットする確率が高いデモ規模では十分機能
-- KV の書き込みレイテンシ（数十 ms）と課金を避けられる
-- `checkRateLimit(ip, now)` シグネチャで KV 版への差し替えが機械的にできる
+- per-IP guard は「短時間の連打を落とす」目的に限定し、正確なglobal accountingとは主張しない
+- 日次quotaは slug / IP / articleHash / cache key で分散させず、固定名Durable Objectをsource of truthにする
+- quotaは live AI API call を開始する権利としてreserveし、upstream call開始後の失敗もcost exposureとして別カウントする
 
 **トレードオフ**:
 - access key はデモ用の利用条件であり、ユーザー別認可ではない。本格運用では Turnstile / Cloudflare Access / アカウント制認証に置き換える。
-- 複数 isolate が並列起動するケースで制限が緩くなる。本番スケール時は `env.RATE_LIMITER.limit({ key })` Cloudflare Rate Limiter binding に置換可能。
-- 同種の公開 AI エンドポイントで共通化しやすい判断（共通の問題は共通の解で対応、コード読解負荷を下げる）。
+- per-IP sliding window は引き続き in-memory なので、Workers の複数 isolate 環境では短期連打抑止として扱う。本番SaaS化では Cloudflare Rate Limiting binding や Turnstile を追加する。
+- Durable Objects binding が production で欠けている場合は、memory fallback へ黙って落とさず `server_misconfigured` で失敗させる。
+- fixed-name `GlobalSummaryQuotaDO` は説明しやすい一方、traffic が大きくなれば hotspot になる。ポートフォリオ規模ではquota正確性と説明容易性を優先した。
 
 ---
 
-## 5. AI 要約結果の in-memory cache（TTL 1h）
+## 5. AI 要約結果は Durable Objects cache（TTL 1h）
 
-**決定**: 同 slug の連続 POST で Anthropic API を再呼出ししないよう、Map ベースのキャッシュを実装。キーは `summary:<slug>`、TTL 1 時間。
+**決定**: 同じ記事・同じmodelの連続 POST で Anthropic API を再呼出ししないよう、`SummaryCacheDO` に要約を保存する。キーは `summary:v1:<model>:<slug>:<articleHash>`、TTL 1 時間。dev / test のみ in-memory fallback を使う。
 
 **理由**:
-- 同じ記事のページを採用担当者が複数回読む場合、初回以外は 28ms で返る（実測）
+- 同じ記事のページを第三者が複数回読む場合、2回目以降のlive AI生成を避けられる
 - レート制限と独立してコスト保護を 2 重に効かせる
 - 1 時間 TTL は「同セッション内で再生成は不要」という前提に合致
+- articleHash を含めることで、記事本文が変わった時に古い要約を使わない
+- pending marker と route 側の再確認で、同一cache keyの同時リクエストによる重複live AI生成を抑える
 
 **トレードオフ**:
-- 複数 isolate での非共有は同上。
-- TTL 1 時間内に記事内容を編集した場合、要約が古いまま。デモ用途では問題ないが、運用時は管理画面から手動 invalidate API を足す余地あり。
+- production `cached:true` は Durable Objects 実装後に manual-live-summary-smoke で再確認する必要がある。
+- `SummaryCacheDO` の pending marker は Durable Object Storage に保存するが、同一Object lifetime内の待機効率化にはin-memory signalも使う。eviction / restart時はStorage側のpending markerを優先し、timeout時は再試行を促す。
+- Cache API はデータセンター間で自動複製されないため、source of truth にはしない。使う場合もlocal edge accelerationに限定する。
 
 ---
 

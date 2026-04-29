@@ -24,6 +24,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { H3Event } from 'h3';
 import { _resetDailyLimitForTesting } from '../utils/daily-limit';
+import { _resetSummaryControlMemoryForTesting } from '../utils/summary-control';
 import { executeSummaryHandler } from './summary.post';
 
 // summary.post.ts のトップレベル `export default defineEventHandler(...)` は
@@ -62,6 +63,7 @@ const SAMPLE_ARTICLE: MockArticle = {
     children: [{ type: 'text', value: 'flat config の本文サンプル。' }],
   },
 };
+const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
 
 /** queryCollection の mock を生成する。article=null なら not_found ケース。 */
 function makeQueryCollection(article: MockArticle | null): ReturnType<typeof vi.fn> {
@@ -122,6 +124,7 @@ describe('executeSummaryHandler (route handler 本体)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     _resetDailyLimitForTesting();
+    _resetSummaryControlMemoryForTesting();
 
     // Nuxt server auto-import を stub
     vi.stubGlobal(
@@ -161,6 +164,7 @@ describe('executeSummaryHandler (route handler 本体)', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    process.env.NODE_ENV = ORIGINAL_NODE_ENV;
   });
 
   it('成功フロー: cache miss → Anthropic 呼び出し → response 返却', async () => {
@@ -252,6 +256,26 @@ describe('executeSummaryHandler (route handler 本体)', () => {
         queryCollection,
         AnthropicCtor,
         runtimeConfig: { anthropicApiKey: '' }, // 未設定を再現
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 500,
+      statusMessage: 'server_misconfigured',
+      data: { error: 'server_misconfigured' },
+    });
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('server_misconfigured: production で Durable Object binding が無いと memory fallback せず 500', async () => {
+    process.env.NODE_ENV = 'production';
+    vi.stubGlobal('readBody', vi.fn().mockResolvedValue({ slug: 'missing-do-binding-test' }));
+    const queryCollection = makeQueryCollection(SAMPLE_ARTICLE);
+    const { ctor: AnthropicCtor, createSpy } = makeAnthropicCtor('success');
+
+    await expect(
+      executeSummaryHandler(makeEvent(), {
+        queryCollection,
+        AnthropicCtor,
+        runtimeConfig: { anthropicApiKey: 'sk-test-key' },
       }),
     ).rejects.toMatchObject({
       statusCode: 500,

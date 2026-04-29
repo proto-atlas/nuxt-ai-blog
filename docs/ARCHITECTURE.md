@@ -33,14 +33,15 @@ nuxt-ai-blog は Nuxt 4 + Vue 3.5 の SSR ブログで、Cloudflare Workers の 
 │ ├─ checkRateLimit (10 req/60s, IP単位) │
 │ ├─ checkSummaryAccess (server-only secret照合) │
 │ ├─ slug validation (^[a-z0-9-]{1,127}$) │
-│ ├─ cacheGet (in-memory, TTL 1h) │
 │ ├─ queryCollection(event, 'blog') │
 │ │ └─ env.DB (D1 Database) │
+│ ├─ SummaryCacheDO (slug + articleHash + model, TTL 1h) │
+│ ├─ GlobalSummaryQuotaDO (固定名Object, daily reservation) │
 │ ├─ anthropic.messages.create( │
 │ │ model: claude-haiku-4-5, │
 │ │ max_tokens: 256, │
 │ │ maxRetries: 0) │
-│ └─ cacheSet (TTL 1h) │
+│ └─ SummaryCacheDO.store (TTL 1h) │
 │ │
 │ enable_request_signal flag │
 │ → client disconnect で Anthropic abort │
@@ -79,11 +80,13 @@ nuxt-ai-blog は Nuxt 4 + Vue 3.5 の SSR ブログで、Cloudflare Workers の 
  1. `checkRateLimit(getClientIp(event))` → 失敗で 429 + Retry-After
  2. `checkSummaryAccess(event, runtimeConfig.summaryAccessKey)` → 失敗で 401
  3. slug バリデーション（英小文字数字ハイフンのみ）→ 失敗で 400
- 4. `cacheGet('summary:<slug>')` → ヒットなら `{ ...cached, cached: true }` 即返却
- 5. `fetchBlogArticleBySlug(event, slug)` で記事 fetch（server-side `queryCollection` の型境界は adapter に閉じ込める）
- 6. `checkDailyLimit()` → 失敗で 429 + Retry-After
- 7. `client.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 256, maxRetries: 0 })`
- 8. `cacheSet('summary:<slug>', response, 60*60*1000)`
+ 4. `fetchBlogArticleBySlug(event, slug)` で記事 fetch（server-side `queryCollection` の型境界は adapter に閉じ込める）
+ 5. `buildSummaryCacheKey({ slug, model, sourceText })` で `summary:v1:<model>:<slug>:<articleHash>` を生成
+ 6. `SummaryCacheDO.inspect` → ヒットなら `{ ...cached, cached: true }` 即返却
+ 7. `SummaryCacheDO.claim` → 同一key生成中なら短時間待機し、二重live AI生成を抑制
+ 8. `GlobalSummaryQuotaDO.reserveDailyGeneration` → 失敗で 429 + Retry-After
+ 9. `client.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 256, maxRetries: 0 })`
+ 10. `SummaryCacheDO.store` と `GlobalSummaryQuotaDO.markGenerationSucceeded`
 4. composable が `summary.value = res` し、UI に表示
 
 ### 4. テーマ切替
@@ -127,7 +130,11 @@ nuxt-ai-blog は Nuxt 4 + Vue 3.5 の SSR ブログで、Cloudflare Workers の 
 │ ├── rate-limit.ts # h3 event 版 sliding window
 │ ├── summary-access.ts # AI要約アクセスキー検証
 │ ├── content-query.ts # Nuxt Content server-side query adapter
-│ └── cache.ts # TTL 付き in-memory key-value
+│ ├── summary-control.ts # DO / dev-test fallback のsummary制御adapter
+│ ├── summary-durable-objects.ts # SummaryCacheDO / GlobalSummaryQuotaDO
+│ └── cache.ts # dev/test fallback 用TTL付き in-memory key-value
+├── worker/
+│ └── index.mjs # Nitro出力をwrapし、DO classをexportするWrangler entry
 ├── utils/
 │ └── article-filter.ts # 記事検索 / タグ絞り込みの純関数
 └── tests/
@@ -139,7 +146,7 @@ nuxt-ai-blog は Nuxt 4 + Vue 3.5 の SSR ブログで、Cloudflare Workers の 
 
 | 層 | 対象 | ツール | 件数 |
 |---|---|---|---|
-| Unit (server) | `server/utils/{rate-limit,cache,daily-limit,summary-parse,article-text,summary-helpers,summary-access,content-query}` | Vitest (Node 環境) | 8 ファイル |
+| Unit (server) | `server/utils/{rate-limit,cache,daily-limit,summary-parse,article-text,summary-helpers,summary-access,content-query,summary-control,summary-durable-objects}` | Vitest (Node 環境) | 10 ファイル |
 | Unit (shared UI logic) | `utils/article-filter` | Vitest | 1 ファイル |
 | Unit (composable) | `composables/useAiSummary` | Vitest + happy-dom + `$fetch` mock | 1 ファイル |
 | Component | `components/{ArticleCard,AiSummaryButton,ThemeToggle}` | Vitest + @vue/test-utils | 3 ファイル |
@@ -147,7 +154,7 @@ nuxt-ai-blog は Nuxt 4 + Vue 3.5 の SSR ブログで、Cloudflare Workers の 
 | E2E (AI 要約) | 成功フロー / 429 rate_limit / 500 upstream_unavailable (`page.route` mock) | Playwright (Chromium) | 3 pass |
 | E2E (a11y target-size) | 記事一覧 / 記事詳細の主要操作 44×44 CSS px 検査 | Playwright (Chromium) | 3 pass |
 
-合計 Vitest **109 件 / 16 ファイル** + Playwright **10 件**。coverage は CI quality-gate で `vitest.config.ts` の閾値を機械的に強制し、2026-04-29 時点の実測は stmts 95.76 / branches 87.83 / funcs 98.03 / lines 96.59。`server/api/summary.post.ts` は `executeSummaryHandler` を named export 化 + `SummaryHandlerDeps` で Anthropic SDK / queryCollection / runtimeConfig を依存注入可能にし、handler 本体 10 ケースのテストを追加している。
+合計 Vitest **121 件 / 18 ファイル** + Playwright **10 件**。coverage は CI quality-gate で `vitest.config.ts` の閾値を機械的に強制し、2026-04-29 時点の実測は stmts 84.86 / branches 79.20 / funcs 90.00 / lines 86.49。`server/api/summary.post.ts` は `executeSummaryHandler` を named export 化 + `SummaryHandlerDeps` で Anthropic SDK / queryCollection / runtimeConfig を依存注入可能にし、handler 本体 11 ケースのテストを追加している。
 
 ## CI
 
@@ -165,7 +172,7 @@ nuxt-ai-blog は Nuxt 4 + Vue 3.5 の SSR ブログで、Cloudflare Workers の 
 - **Summary access key**: Cloudflare Workers Secrets `NUXT_SUMMARY_ACCESS_KEY` を server-only runtimeConfig として読み、`X-Summary-Access-Key` と照合
 - **D1 binding**: `wrangler.jsonc` の `database_id` は public 扱い（API token 必須でアクセス制御）
 - **入力検証**: slug の正規表現 `^[a-z0-9][a-z0-9-]{0,126}$`（SSRF / path traversal 対策）
-- **レート制限**: IP 単位 10 req / 60s（CF-Connecting-IP 優先、sliding window、in-memory）+ global daily limit 200 req / UTC日
+- **レート制限**: IP 単位 10 req / 60s（CF-Connecting-IP 優先、sliding window、in-memory short-window guard）+ fixed-name `GlobalSummaryQuotaDO` の global daily live-generation quota 200 req / UTC日
 - **セキュリティヘッダ**: `nuxt.config.ts` の `routeRules` で全ルート一括付与（nosniff / X-Frame-Options DENY / Referrer-Policy / Permissions-Policy / HSTS）
 - **クライアント切断保護**: `enable_request_signal` flag で Anthropic への課金漏れを防止
 - **XSS**: Vue / Nuxt 標準エスケープ。`v-html` は ContentRenderer 内部のみ（Markdown のサニタイズは `@nuxt/content` 標準）

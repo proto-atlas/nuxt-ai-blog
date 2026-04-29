@@ -1,7 +1,7 @@
 /**
  * Cloudflare Workers の env binding を h3 H3Event から安全に取り出す adapter。
  *
- * Rate Limiting Binding へ移行する場合に備え、adapter + 型定義を先に分離する。
+ * Rate Limiting Binding / Durable Objects へ移行する場合に備え、adapter + 型定義を先に分離する。
  * `wrangler.jsonc` への実 binding 追加は、Cloudflare 側の binding 作成後に行う。
  *
  * 設計:
@@ -23,6 +23,12 @@
  * }
  */
 
+import type {
+  DurableObjectNamespaceLike,
+  SummaryCacheStub,
+  SummaryQuotaStub,
+} from './summary-control-types';
+
 /**
  * Cloudflare Rate Limiting Binding の最小型。
  * 公式 docs (https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
@@ -40,6 +46,10 @@ export interface CloudflareRateLimiter {
 export interface CloudflareEnv {
   /** D1 binding (`wrangler.jsonc` の `bindings.DB`)。Nuxt Content 3 が D1 切替後に使用予定 */
   DB?: unknown;
+  /** Global daily quota を固定名 Durable Object に集約する binding。 */
+  SUMMARY_QUOTA?: DurableObjectNamespaceLike<SummaryQuotaStub>;
+  /** AI 要約 cache と in-flight 状態を Durable Object Storage に保存する binding。 */
+  SUMMARY_CACHE?: DurableObjectNamespaceLike<SummaryCacheStub>;
   /**
    * Rate Limiting binding を追加した場合の adapter。
    * 現状は未配線、binding 追加 + 本番 smoke は公開前最終確認送り。

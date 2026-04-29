@@ -22,7 +22,7 @@
 // 算出根拠: Anthropic Haiku 4.5 の入力 ~150 字 + 出力 ~150 字を 1 リクエストとすると
 // $0.0008 前後 (実測平均)。月間予算 $5 以内に収めるため 200 req/日 × 30 日 ≈ $4.8。
 // 上限は環境変数 NUXT_DAILY_LIMIT で上書き可能 (本番運用で必要なら拡張)。
-const DEFAULT_DAILY_LIMIT = 200;
+export const DEFAULT_DAILY_LIMIT = 200;
 const MS_PER_DAY = 86_400_000;
 
 interface DailyBucket {
@@ -42,7 +42,7 @@ function getUtcDateString(now: number): string {
   return new Date(now).toISOString().slice(0, 10);
 }
 
-function getDailyLimit(): number {
+export function getDailyLimit(): number {
   const env = process.env.NUXT_DAILY_LIMIT;
   if (env) {
     const parsed = Number.parseInt(env, 10);

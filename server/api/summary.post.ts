@@ -3,18 +3,31 @@
 
 import AnthropicSdk from '@anthropic-ai/sdk';
 import type { H3Event } from 'h3';
-import { cacheGet, cacheSet } from '../utils/cache';
 import { checkRateLimit, getClientIp } from '../utils/rate-limit';
-import { checkDailyLimit } from '../utils/daily-limit';
 import { parseSummaryRequest, extractFirstText } from '../utils/summary-parse';
 import { buildSummarySource } from '../utils/article-text';
 import { summaryError, getRequestSignal } from '../utils/summary-helpers';
 import { checkSummaryAccess } from '../utils/summary-access';
 import { fetchBlogArticleBySlug } from '../utils/content-query';
+import {
+  buildSummaryCacheKey,
+  claimSummaryGeneration,
+  inspectSummaryCache,
+  isProductionRuntime,
+  markGenerationFailedAfterUpstreamCall,
+  markGenerationSucceeded,
+  releaseSummaryClaim,
+  reserveDailyGeneration,
+  resolveSummaryControl,
+  storeSummaryCache,
+  waitForPendingSummary,
+} from '../utils/summary-control';
 import { queryCollection as defaultQueryCollection } from '#imports';
 
 const MODEL = 'claude-haiku-4-5-20251001';
 const SUMMARY_TTL_MS = 60 * 60 * 1000; // 1 時間
+const SUMMARY_PENDING_TTL_MS = 35 * 1000; // Anthropic timeout 30s + commit 余裕
+const SUMMARY_PENDING_WAIT_MS = 10 * 1000; // 同一 key の二重生成を避ける待機上限
 
 export interface SummaryResponse {
   slug: string;
@@ -90,14 +103,7 @@ export async function executeSummaryHandler(
   }
   const slug = parsed.slug;
 
-  // 4. Cache hit check
-  const cacheKey = `summary:${slug}`;
-  const cached = cacheGet<SummaryResponse>(cacheKey);
-  if (cached) {
-    return { ...cached, cached: true };
-  }
-
-  // 5. Fetch article body
+  // 4. Fetch article body
   // Nuxt Content 3 の server-side queryCollection の型境界は adapter に閉じ込める。
   const article = await fetchBlogArticleBySlug(event, slug, queryCollection);
   if (!article) {
@@ -108,6 +114,30 @@ export async function executeSummaryHandler(
   // body 抽出失敗時は title + description のみで fallback (article-text.test.ts でカバー)。
   // BlogCollectionItem は { title, description, body } を含むので構造的 subtype で渡せる。
   const sourceText = buildSummarySource(article);
+  const cacheKey = await buildSummaryCacheKey({ slug, model: MODEL, sourceText });
+  const controlResolution = resolveSummaryControl(event);
+  if (isProductionRuntime() && controlResolution.missingBindings.length > 0) {
+    console.error(
+      '[/api/summary] summary Durable Object bindings are missing:',
+      controlResolution.missingBindings.join(', '),
+    );
+    throw summaryError('server_misconfigured', 500);
+  }
+  const summaryControl = controlResolution.control;
+
+  // 5. Durable Object cache check。cache hit は live AI quota を消費しない。
+  const cached = await inspectSummaryCache(summaryControl, cacheKey);
+  if (cached.status === 'hit') {
+    return { ...cached.value, cached: true };
+  }
+  if (cached.status === 'pending') {
+    const waited = await waitForPendingSummary(summaryControl, cacheKey, SUMMARY_PENDING_WAIT_MS);
+    if (waited.status === 'hit') {
+      return { ...waited.value, cached: true };
+    }
+    setResponseHeader(event, 'Retry-After', cached.retryAfterSeconds);
+    throw summaryError('rate_limit', 429, cached.retryAfterSeconds);
+  }
 
   // 6. API key 取得 (Workers Secret 経由、コードにハードコードしない)。
   // production では default export 側で `useRuntimeConfig(event)` を呼んで deps に
@@ -121,14 +151,31 @@ export async function executeSummaryHandler(
     throw summaryError('server_misconfigured', 500);
   }
 
-  // 7. Global daily limit (有効キー + cache miss + 設定正常のリクエストだけを課金枠として数える)
-  const daily = checkDailyLimit();
+  // 7. 同一 slug / articleHash / model の二重 live AI 生成を避ける。
+  // claim 内でも cache を再確認し、別 request が先に cache を埋めた場合は hit として返す。
+  const claim = await claimSummaryGeneration(summaryControl, cacheKey, SUMMARY_PENDING_TTL_MS);
+  if (claim.status === 'hit') {
+    return { ...claim.value, cached: true };
+  }
+  if (claim.status === 'pending') {
+    const waited = await waitForPendingSummary(summaryControl, cacheKey, SUMMARY_PENDING_WAIT_MS);
+    if (waited.status === 'hit') {
+      return { ...waited.value, cached: true };
+    }
+    setResponseHeader(event, 'Retry-After', claim.retryAfterSeconds);
+    throw summaryError('rate_limit', 429, claim.retryAfterSeconds);
+  }
+
+  // 8. Global daily limit。quota は live AI API call を開始する権利として reserve する。
+  // cache hit / unauthorized / validation error では reserve しない。
+  const daily = await reserveDailyGeneration(summaryControl);
   if (!daily.allowed) {
+    await releaseSummaryClaim(summaryControl, cacheKey);
     setResponseHeader(event, 'Retry-After', daily.retryAfterSeconds);
     throw summaryError('rate_limit', 429, daily.retryAfterSeconds);
   }
 
-  // 8. Anthropic 呼び出し (try/catch で SDK 例外を捕まえる、SDK例外処理対応)。
+  // 9. Anthropic 呼び出し (try/catch で SDK 例外を捕まえる、SDK例外処理対応)。
   // maxRetries: 0 で 429/5xx 時の SDK 自動リトライによる多重課金を防ぐ。
   // timeout: 30s で Anthropic 側のスタックを長時間保持しない (Cloudflare Workers の
   // CPU 時間制限 30s と Anthropic Haiku 4.5 の典型応答 1〜3s を踏まえた余裕値、
@@ -166,20 +213,22 @@ export async function executeSummaryHandler(
     // SDK 例外の生 message は UI に出さない (OWASP Improper Error Handling)。
     // 詳細はサーバーログにのみ残す。
     console.error('[/api/summary] anthropic stream failed:', err);
+    await markGenerationFailedAfterUpstreamCall(summaryControl);
+    await releaseSummaryClaim(summaryControl, cacheKey);
     throw summaryError('upstream_unavailable', 500);
   }
 
-  // 9. キャッシュ書き込み + レスポンス
-  const response: SummaryResponse = {
+  // 10. キャッシュ書き込み + レスポンス
+  const payload = {
     slug,
     summary,
     model,
-    cached: false,
     generatedAt: new Date().toISOString(),
   };
-  cacheSet(cacheKey, response, SUMMARY_TTL_MS);
+  await storeSummaryCache(summaryControl, cacheKey, payload, SUMMARY_TTL_MS);
+  await markGenerationSucceeded(summaryControl);
 
-  return response;
+  return { ...payload, cached: false };
 }
 
 // production では Nuxt auto-import の useRuntimeConfig を default export 側で評価し、
