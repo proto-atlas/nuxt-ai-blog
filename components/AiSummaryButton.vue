@@ -91,5 +91,18 @@ async function handleClick() {
         <span>{{ new Date(summary.generatedAt).toLocaleString('ja-JP') }}</span>
       </div>
     </div>
+    <div
+      v-else
+      class="mt-3 rounded-md border border-emerald-200 bg-white p-3 text-xs text-slate-700 dark:border-emerald-900 dark:bg-slate-950 dark:text-slate-300"
+    >
+      <p class="font-medium text-slate-900 dark:text-slate-100">キーなしプレビュー</p>
+      <p class="mt-1">
+        実AI APIは呼ばず、記事本文から150文字前後の要約を返す表示例だけ確認できます。
+      </p>
+      <p class="mt-2 text-sm leading-relaxed text-slate-900 dark:text-slate-100">
+        Nuxt Contentの記事本文をCloudflare
+        Workers上で取得し、短い要約として返す構成です。アクセスキー、日次上限、キャッシュで公開デモのコストを抑えます。
+      </p>
+    </div>
   </div>
 </template>
