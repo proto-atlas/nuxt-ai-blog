@@ -18,6 +18,7 @@
 | Duplicate generation guard | `SummaryCacheDO` の pending marker と route 側の cache再確認で同一keyの重複生成を抑制 |
 | Production fallback | `SUMMARY_QUOTA` / `SUMMARY_CACHE` が欠けている production では memory fallback せず `server_misconfigured` |
 | Dev/test fallback | local unit test と dev では in-memory fallback を許容 |
+| Durable Object RPC | Worker entrypointで `DurableObject` を継承したwrapper classをexportし、Cloudflare RPC要件を満たす |
 
 ## 変更ファイル
 
@@ -41,14 +42,36 @@
 | Prettier | `prettier --check .` exit 0 |
 | Build | `nuxt build` exit 0 |
 | Wrangler dry-run | `wrangler deploy --dry-run` exit 0; `SUMMARY_QUOTA`, `SUMMARY_CACHE`, `DB`, `ASSETS` bindings recognized |
+| Production deploy | `wrangler deploy` exit 0; Version ID `15998226-2fdc-4d4b-aa23-7271908acaf1`; `SUMMARY_QUOTA`, `SUMMARY_CACHE`, `DB`, `ASSETS` bindings recognized |
+| Manual live summary smoke | same slug / same articleHash / same model: first request `cached:false`, second request `cached:true`; summary length 100; `generatedAt` `2026-04-29T07:10:09.254Z` |
 
 ## 未確認
 
-- Cloudflare production deploy after this Durable Objects change.
-- Manual live summary smoke after deploy.
-- Production `cached:true` for same slug / same articleHash / same model.
-- Production quotaRemaining behavior.
+- Production quotaRemaining behavior is not exposed by the public API response.
 - Production 429 burst test. This is intentionally not part of normal smoke unless a safe low threshold is configured.
+
+## Production Issue Found and Fixed
+
+最初のDurable Objects deploy後、authorized `/api/summary` は HTTP 500 を返した。
+Wrangler tailで確認した本番エラーは以下。
+
+> The receiving Durable Object does not support RPC, because its class was not declared with `extends DurableObject`.
+
+原因:
+
+- `wrangler.jsonc` の Durable Object class export がRPC対象だったが、export classがCloudflareの `DurableObject` を継承していなかった。
+
+修正:
+
+- `worker/index.mjs` で `cloudflare:workers` から `DurableObject` をimport。
+- `SummaryCacheDO` / `GlobalSummaryQuotaDO` の薄いwrapper classを `extends DurableObject` としてexport。
+- 実装ロジックは `server/utils/summary-durable-objects.ts` に残し、wrapperから委譲。
+
+修正後:
+
+- `wrangler deploy --dry-run`: pass
+- `wrangler deploy`: pass
+- manual-live-summary-smoke: first request `cached:false`, second request `cached:true`
 
 ## Warning Notes
 
