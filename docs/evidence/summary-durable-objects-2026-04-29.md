@@ -42,7 +42,7 @@
 | Prettier | `prettier --check .` exit 0 |
 | Build | `nuxt build` exit 0 |
 | Wrangler dry-run | `wrangler deploy --dry-run` exit 0; `SUMMARY_QUOTA`, `SUMMARY_CACHE`, `DB`, `ASSETS` bindings recognized |
-| Production deploy | `wrangler deploy` exit 0; Version ID `15998226-2fdc-4d4b-aa23-7271908acaf1`; `SUMMARY_QUOTA`, `SUMMARY_CACHE`, `DB`, `ASSETS` bindings recognized |
+| Production deploy | `wrangler deploy` exit 0; `SUMMARY_QUOTA`, `SUMMARY_CACHE`, `DB`, `ASSETS` bindings recognized. Cloudflare Version ID changes on each deploy and is intentionally not fixed in this public evidence. |
 | Manual live summary smoke | same slug / same articleHash / same model: first request `cached:false`, second request `cached:true`; summary length 100; `generatedAt` `2026-04-29T07:10:09.254Z` |
 
 ## 未確認
