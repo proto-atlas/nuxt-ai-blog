@@ -1,11 +1,13 @@
 # Production Smoke - 2026-04-29
 
-nuxt-ai-blog の `591cc475e2e917f48f29e213194414f0c99a268d` を Cloudflare Workers に deploy した後の smoke 記録です。
+nuxt-ai-blog を Cloudflare Workers に deploy した後の smoke 記録です。
+この証跡は公開リポの各commitと一緒に管理するため、自己参照になる固定HEADは本文に埋め込まない。
+特定commitを確認する場合は、GitHubのcommit画面、Actions run、Cloudflare deploy logを対応させて確認する。
 
 ## Deploy
 
 - Repository: `proto-atlas/nuxt-ai-blog`
-- HEAD: `591cc475e2e917f48f29e213194414f0c99a268d`
+- Branch: `main`
 - Public URL: `https://nuxt-ai-blog.atlas-lab.workers.dev`
 - Deploy command: `npm run deploy`
 - Result: success
@@ -57,4 +59,3 @@ Deploy 時の warning:
 - アクセスキーなしの呼び出しは 401 で拒否された。
 - 同一 slug の直後再実行でも `cached:true` は確認できなかった。これは in-memory cache が Worker isolate 単位で分かれる既知制約と整合する。成功扱いにはせず、cache hit の本番証跡は未取得として扱う。
 - 本格運用で cache hit を強く保証するなら、KV、Durable Objects、D1、または Cache API に移す。
-
