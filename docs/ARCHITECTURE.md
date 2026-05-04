@@ -150,11 +150,11 @@ nuxt-ai-blog は Nuxt 4 + Vue 3.5 の SSR ブログで、Cloudflare Workers の 
 | Unit (shared UI logic) | `utils/article-filter` | Vitest | 1 ファイル |
 | Unit (composable) | `composables/useAiSummary` | Vitest + happy-dom + `$fetch` mock | 1 ファイル |
 | Component | `components/{ArticleCard,AiSummaryButton,ThemeToggle}` | Vitest + @vue/test-utils | 3 ファイル |
-| E2E (blog) | 記事一覧 5 本 / 検索とタグ絞り込み / 詳細遷移 / ダークモード | Playwright (Chromium) | 4 pass |
+| E2E (blog) | 記事一覧 5 本 / 検索とタグ絞り込み / 詳細遷移 / 一覧へ戻る導線 / ダークモード | Playwright (Chromium) | 5 pass |
 | E2E (AI 要約) | 成功フロー / 429 rate_limit / 500 upstream_unavailable (`page.route` mock) | Playwright (Chromium) | 3 pass |
 | E2E (a11y target-size) | 記事一覧 / 記事詳細の主要操作 44×44 CSS px 検査 | Playwright (Chromium) | 3 pass |
 
-合計 Vitest **126 件 / 20 ファイル** + Playwright **10 件**。coverage は CI quality-gate で `vitest.config.ts` の閾値を機械的に強制し、2026-04-29 時点の実測は stmts 85.51 / branches 79.67 / funcs 90.74 / lines 87.10。`server/api/summary.post.ts` は `executeSummaryHandler` を named export 化 + `SummaryHandlerDeps` で `summaryClient` / queryCollection / runtimeConfig を依存注入可能にし、Anthropic SDK 境界は `server/utils/summary-ai-client.ts` に閉じ込めている。
+合計 Vitest **126 件 / 20 ファイル** + Playwright **11 件**。coverage は CI quality-gate で `vitest.config.ts` の閾値を機械的に強制し、2026-04-29 時点の実測は stmts 85.51 / branches 79.54 / funcs 90.74 / lines 87.10。`server/api/summary.post.ts` は `executeSummaryHandler` を named export 化 + `SummaryHandlerDeps` で `summaryClient` / queryCollection / runtimeConfig を依存注入可能にし、Anthropic SDK 境界は `server/utils/summary-ai-client.ts` に閉じ込めている。
 
 ## CI
 
@@ -176,4 +176,3 @@ nuxt-ai-blog は Nuxt 4 + Vue 3.5 の SSR ブログで、Cloudflare Workers の 
 - **セキュリティヘッダ**: `nuxt.config.ts` の `routeRules` で全ルート一括付与（nosniff / X-Frame-Options DENY / Referrer-Policy / Permissions-Policy / HSTS）
 - **クライアント切断保護**: `enable_request_signal` flag で Anthropic への課金漏れを防止
 - **XSS**: Vue / Nuxt 標準エスケープ。`v-html` は ContentRenderer 内部のみ（Markdown のサニタイズは `@nuxt/content` 標準）
-- **コミット履歴**: 全 author を `proto-atlas <278522736+proto-atlas@users.noreply.github.com>` に固定（個人 GitHub と分離）
