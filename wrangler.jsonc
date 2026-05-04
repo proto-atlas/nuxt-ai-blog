@@ -1,0 +1,45 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nuxt-ai-blog",
+  // Durable Object class を export するため、Nuxt/Nitro 出力を包む wrapper を entry にする。
+  // wrapper は deploy 前の `nuxt build` で生成される .output/server/index.mjs を import する。
+  "main": "worker/index.mjs",
+  // Nuxt Content 3 の Cloudflare Workers サポートは compatibility_date >= 2025-05-15 が必要
+  "compatibility_date": "2025-05-15",
+  // nodejs_compat は @anthropic-ai/sdk 等の Node.js 組み込みモジュール参照に必須。
+  // enable_request_signal は client disconnect → Request.signal.abort イベント配信
+  // (長時間 AI 要約のコスト保護) に使う。
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
+  "assets": {
+    "directory": ".output/public",
+    "binding": "ASSETS",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nuxt-ai-blog-content",
+      // `wrangler d1 create nuxt-ai-blog-content` で 2026-04-24 発行 (APAC region)
+      "database_id": "9c31d7bf-9546-4054-a859-8790669ac5da",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SUMMARY_QUOTA",
+        "class_name": "GlobalSummaryQuotaDO",
+      },
+      {
+        "name": "SUMMARY_CACHE",
+        "class_name": "SummaryCacheDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1-summary-control",
+      "new_sqlite_classes": ["GlobalSummaryQuotaDO", "SummaryCacheDO"],
+    },
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+}
