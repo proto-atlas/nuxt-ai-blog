@@ -52,7 +52,7 @@ export interface CloudflareEnv {
   SUMMARY_CACHE?: DurableObjectNamespaceLike<SummaryCacheStub>;
   /**
    * Rate Limiting binding を追加した場合の adapter。
-   * 現状は未配線、binding 追加 + 本番 smoke は公開前最終確認送り。
+   * 現状は未配線。binding 追加後に deployment smoke で有効性を確認する。
    */
   RATE_LIMITER?: CloudflareRateLimiter;
 }
