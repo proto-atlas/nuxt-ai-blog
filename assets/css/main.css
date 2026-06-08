@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+
+/* class戦略のdark variant (Tailwind v4 公式)
+ * @nuxtjs/color-modeのclassSuffix: '' と連携して <html class="dark"> で切替。 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Nuxt Content 3 (Shiki syntax highlighter) のコードブロックはTwoslash等の長い
+ * token (URL / フルパス) を含むとoverflowする。375pxで記事詳細ページが横スクロール
+ * になっていた問題 (QAで発見) を抑制するための共通スタイル。
+ *
+ * - <pre> は横スクロール可能にして親コンテナに干渉させない
+ * - インライン <code> はbreak-allで確実にwrapさせる
+ * - 親のprose / articleはmin-w-0 でgrid/flex子要素のoverflow計算を正しくする
+ */
+.prose pre {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.prose :not(pre) > code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+article {
+  min-width: 0;
+}
