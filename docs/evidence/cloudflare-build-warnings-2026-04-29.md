@@ -7,8 +7,9 @@
 - Project: `nuxt-ai-blog`
 - デプロイ方式: Cloudflare Workers (`nitro.preset = cloudflare_module`)
 - 確認日: 2026-04-29
+- 最終更新: 2026-06-11
 - 実API呼び出し: 実施なし
-- 結果: warningを記録済み。buildとdeployはpass
+- 結果: 現在残っているwarningと解消済みwarningを分けて記録。buildとdeployはpass
 
 ## 現在の設定
 
@@ -25,11 +26,16 @@
 | warning | このプロジェクトでの意味 | 現在の影響 | 次回確認 | 解消条件 |
 |---|---|---|---|---|
 | Nuxt ContentがCloudflareデプロイ向けにD1 binding `DB` へ切り替える | このプロジェクトはWorkersへデプロイし、`wrangler.jsonc` に `DB` D1 bindingを持つ。Nuxt Contentの保存先はAI要約のquota/cacheとは別。 | build/deploy通過。公開URL確認で記事ページを表示できる。 | Nuxt Contentまたはデプロイ方式を変えた後に再確認する。 | Workers+D1を採用する限り記録として残す。本番の記事表示が壊れる、またはPages/static outputへ変える場合だけ分類を見直す。 |
-| Vue language plugin export warning | `nuxt typecheck` が `vue-router/volar/sfc-route-blocks` のexport warningを出す。 | typecheckはexit 0。型エラーは出ていない。 | Vue / vue-router / Nuxt更新後に再確認する。 | warningが消え、かつtypecheckがpassのままなら一覧から外す。 |
 | Vite module-preload / Tailwind sourcemap warning | 生成されたbuild outputでsourcemap品質のwarningが出る（`nuxt:module-preload-polyfill`, `@tailwindcss/vite`）。 | build/deploy通過。公開URL確認でruntime failureは観測していない。 | stack trace debuggingやsourcemap品質がrelease要件になった時点で再確認する。 | debugging、sourcemap upload、本番deployを妨げない限りtooling noiseとして扱う。 |
 | Nitro virtual storage external dependency warning | 生成されたNitro outputが `@nuxt/nitro-server/dist/runtime/utils/cache-driver.js` をexternal dependencyとして扱う。 | build exit 0。既存の公開URL確認は通過。 | Nuxt/Nitro更新後に再確認する。 | 生成されたNitro outputがwarningを出さず、公開URL確認もpassなら削除する。 |
 | Cloudflare unenv bare import warning | 生成されたNitro outputにCloudflare/unenvが警告するimportが含まれる。 | `wrangler deploy --dry-run` とdeployは通過。 | Nuxt/Nitro/Cloudflare runtime更新後に再確認する。 | dry-run deployと本番デプロイがwarningなしで通過した場合だけ削除する。 |
 | 生成outputのduplicate `euro` key warning | 依存パッケージ由来の生成output warningで、アプリ側の手書きロジックではない。 | build/deploy通過。 | 依存更新後に再確認する。 | 生成outputがduplicate-key warningを出さなくなった場合だけ削除する。 |
+
+## 解消済みのwarning
+
+| warning | 対応 | 確認結果 |
+|---|---|---|
+| Vue language plugin export warning | root dependencyの `vue-router` をNuxtが利用する5.1.0系に揃えた。 | 2026-06-11に `npm run typecheck` を再実行し、`vue-router/volar/sfc-route-blocks` のexport warningが出ないことを確認した。 |
 
 ## 追跡方針
 

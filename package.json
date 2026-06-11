@@ -39,7 +39,7 @@
     "nuxt": "^4.4.5",
     "tailwindcss": "^4.2.4",
     "vue": "^3.5.33",
-    "vue-router": "^4.5.1"
+    "vue-router": "^5.1.0"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.15.2",
