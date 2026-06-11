@@ -7,6 +7,7 @@ export default defineVitestConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
+    hookTimeout: 30000,
     include: ['**/*.{test,spec}.{ts,tsx,vue}'],
     exclude: [
       'node_modules/**',

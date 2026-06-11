@@ -27,6 +27,9 @@
     "capture:screenshots": "node scripts/capture-screenshots.mjs",
     "prepare": "husky"
   },
+  "overrides": {
+    "shell-quote": "^1.8.4"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
     "@nuxt/content": "^3.13.0",

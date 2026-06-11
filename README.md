@@ -1,5 +1,7 @@
 # nuxt-ai-blog
 
+[![CI](https://github.com/proto-atlas/nuxt-ai-blog/actions/workflows/ci.yml/badge.svg)](https://github.com/proto-atlas/nuxt-ai-blog/actions/workflows/ci.yml)
+
 > Nuxt Contentベースの技術ブログ。記事検索とタグ絞り込み、記事ごとのAnthropic Claude AI要約を備えたデモです。
 
 Markdownで書いた記事をNuxt Content 3 が読み取り、一覧ページと詳細ページに表示します。記事一覧では検索とタグ絞り込みができ、記事詳細ページでアクセスキーを入力するとClaude Haiku 4.5 が記事内容を 150 字以内に要約します。AI要約はアクセスキー、IP単位の短期制限、Durable Objectsの要約キャッシュと日次上限で呼び出し回数を抑えています。

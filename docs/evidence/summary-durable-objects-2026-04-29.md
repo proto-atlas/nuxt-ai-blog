@@ -49,7 +49,7 @@
 
 - productionの `quotaRemaining` は、意図的に公開APIレスポンスへ出していません。
 - Reserve / succeeded / failed-after-upstream-callの挙動は [`summary-quota-diagnostics-2026-04-29.md`](./summary-quota-diagnostics-2026-04-29.md) に記録。
-- production 429 burst testは、安全な低しきい値を設定しない限り、通常の疎通確認には含めません。
+- 本番設定で429を発生させるバースト確認は、安全な低しきい値を設定しない限り通常の疎通確認では扱いません。
 
 ## 本番で見つかった問題と修正
 
